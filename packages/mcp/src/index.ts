@@ -40,7 +40,7 @@ const server = new Server(
 const TOOLS = [
   {
     name: 'inspect',
-    description: 'Get the structural outline headings of a Markdown file. MUST use this tool first when you want to modify, understand, or edit a Markdown document, to locate target nodes by their runtime_id before reading or patching.',
+    description: 'Extracts the structural outline (headings, levels, and runtime IDs) of an existing Markdown file. Recommended for understanding document layout and locating specific nodes before reading or editing, saving token overhead on large files.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -64,7 +64,7 @@ const TOOLS = [
   },
   {
     name: 'search',
-    description: 'Search for text patterns inside a Markdown file, returning matching AST logical nodes. Use this to quickly find specific sections, list items, or tables to edit in a large Markdown document without reading the entire file.',
+    description: 'Searches for text patterns inside an existing Markdown file and maps them to AST logical nodes (sections, list items, tables). Recommended for finding specific modification targets in large files without reading the entire document.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -108,7 +108,7 @@ const TOOLS = [
   },
   {
     name: 'read',
-    description: 'Read the contents of specific Markdown nodes by their runtime_id and acquire cryptographically signed anchor_tokens. You MUST call this tool to read the node before applying any patch, as the patch tool requires the anchor_token returned here.',
+    description: 'Reads the text contents of specific Markdown nodes by their runtime_id and generates cryptographically signed anchor_tokens. Use this tool to inspect targeted content and obtain the token required by the patch tool for safe editing.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -142,7 +142,7 @@ const TOOLS = [
   },
   {
     name: 'patch',
-    description: 'Safely edit (replace, delete, insert) Markdown node contents using signed anchor_tokens. This is the ONLY authorized way to modify Markdown files, preventing silent overwrites and concurrent conflicts. Do NOT use generic write_file or edit_file tools for Markdown files.',
+    description: 'Performs safe, structure-aware mutations (replace, delete, insert) to specific Markdown nodes using signed anchor_tokens. Strongly preferred over full-file rewrites for updating existing sections, list items, or tables to prevent formatting loss and concurrent conflicts. (Use generic file tools for file creation, deletion, or non-structural modifications).',
     inputSchema: {
       type: 'object',
       properties: {
