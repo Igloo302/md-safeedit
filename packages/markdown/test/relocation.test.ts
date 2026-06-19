@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { parseMarkdownToNodes } from '../src/parser/parser.js';
 import { buildLogicalSections } from '../src/sections/sections.js';
-import { relocateNode } from '../src/relocation/relocation.js';
+import { relocateNode, getPathFingerprint } from '../src/relocation/relocation.js';
 import { AnchorPayloadV1 } from '@md-safeedit/protocol';
 
 describe('Exact Relocation Scoring Engine', () => {
@@ -24,7 +24,7 @@ describe('Exact Relocation Scoring Engine', () => {
       nodeType: targetNode.type,
       structuralPath: targetNode.structuralPath,
       structuralEvidence: {
-        pathFingerprint: 'Section 1',
+        pathFingerprint: getPathFingerprint(targetNode.structuralPath),
         parentFingerprint: nodesInitial.find(n => n.type === 'section')!.rawHash,
         siblingOccurrence: 1
       },
@@ -62,7 +62,7 @@ describe('Exact Relocation Scoring Engine', () => {
       nodeType: targetNode.type,
       structuralPath: targetNode.structuralPath,
       structuralEvidence: {
-        pathFingerprint: 'Section 1',
+        pathFingerprint: getPathFingerprint(targetNode.structuralPath),
         parentFingerprint: nodesInitial.find(n => n.type === 'section')!.rawHash,
         siblingOccurrence: undefined
       },
@@ -99,7 +99,7 @@ describe('Exact Relocation Scoring Engine', () => {
       nodeType: targetNode.type,
       structuralPath: targetNode.structuralPath,
       structuralEvidence: {
-        pathFingerprint: 'Section A',
+        pathFingerprint: getPathFingerprint(targetNode.structuralPath),
         parentFingerprint: nodesInitial.find(n => n.type === 'section')!.rawHash,
         siblingOccurrence: 2
       },
@@ -146,7 +146,7 @@ describe('Exact Relocation Scoring Engine', () => {
       structuralPath: targetNode.structuralPath,
       blockId: 'my-block-1',
       structuralEvidence: {
-        pathFingerprint: 'Section A',
+        pathFingerprint: getPathFingerprint(targetNode.structuralPath),
         parentFingerprint: nodesInitial.find(n => n.type === 'section')!.rawHash,
         blockId: 'my-block-1'
       },
@@ -184,7 +184,7 @@ describe('Exact Relocation Scoring Engine', () => {
       nodeType: targetNode.type,
       structuralPath: targetNode.structuralPath,
       structuralEvidence: {
-        pathFingerprint: 'Table Section',
+        pathFingerprint: getPathFingerprint(targetNode.structuralPath),
         parentFingerprint: nodesInitial.find(n => n.type === 'table')!.rawHash,
         siblingOccurrence: 2 // Second row in the table
       },
@@ -222,7 +222,7 @@ describe('Exact Relocation Scoring Engine', () => {
       nodeType: targetNode.type,
       structuralPath: targetNode.structuralPath,
       structuralEvidence: {
-        pathFingerprint: 'List Section',
+        pathFingerprint: getPathFingerprint(targetNode.structuralPath),
         siblingOccurrence: 2 // Second item under its parent sublist
       },
       dialect: 'commonmark+gfm',
@@ -259,7 +259,7 @@ describe('Exact Relocation Scoring Engine', () => {
       nodeType: targetNode.type,
       structuralPath: targetNode.structuralPath,
       structuralEvidence: {
-        pathFingerprint: '',
+        pathFingerprint: getPathFingerprint(targetNode.structuralPath),
         parentFingerprint: nodesInitial.find(n => n.type === 'frontmatter')!.rawHash,
         siblingOccurrence: 2
       },
@@ -276,5 +276,463 @@ describe('Exact Relocation Scoring Engine', () => {
     const relocated = relocateNode(token, nodesCurrent, bytesCurrent.length);
     expect(relocated).not.toBeNull();
     expect(relocated!.content).toBe('status: draft');
+  });
+
+  // --- 15 RELOCATION EDGE-CASE UNIT TESTS ---
+
+  it('relocates when duplicate headings exist in different parents, disambiguated by path fingerprint', () => {
+    const mdInitial = `# Section A\n## Target\nParagraph\n# Section B\n## Target\nParagraph\n`;
+    const bytesInitial = new TextEncoder().encode(mdInitial);
+    const parsedInitial = parseMarkdownToNodes(bytesInitial, mdInitial);
+    const nodesInitial = buildLogicalSections(parsedInitial, bytesInitial, mdInitial);
+    const targetNode = nodesInitial.find(n => n.type === 'heading' && n.content.includes('Target') && n.structuralPath[0].heading === 'Section B')!;
+    const token: AnchorPayloadV1 = {
+      version: 1,
+      fileKey: 'test.md',
+      sourceRevision: 'sha256:initial',
+      range: targetNode.range,
+      rawHash: targetNode.rawHash,
+      nodeType: targetNode.type,
+      structuralPath: targetNode.structuralPath,
+      structuralEvidence: {
+        pathFingerprint: getPathFingerprint(targetNode.structuralPath),
+        parentFingerprint: nodesInitial.find(n => n.runtimeId === targetNode.parentRuntimeId)?.rawHash,
+        siblingOccurrence: 1
+      },
+      dialect: 'commonmark+gfm',
+      issuedAt: Date.now()
+    };
+    const mdCurrent = `# Section A\n## Target\nParagraph\n# Section B\n## Target\nParagraph\n`;
+    const bytesCurrent = new TextEncoder().encode(mdCurrent);
+    const parsedCurrent = parseMarkdownToNodes(bytesCurrent, mdCurrent);
+    const nodesCurrent = buildLogicalSections(parsedCurrent, bytesCurrent, mdCurrent);
+    const relocated = relocateNode(token, nodesCurrent, bytesCurrent.length);
+    expect(relocated).not.toBeNull();
+    expect(relocated!.structuralPath[0].heading).toBe('Section B');
+  });
+
+  it('relocates duplicate headings in the same parent, disambiguated by sibling occurrence', () => {
+    const mdInitial = `# Section A\n## Target\n## Target\n`;
+    const bytesInitial = new TextEncoder().encode(mdInitial);
+    const parsedInitial = parseMarkdownToNodes(bytesInitial, mdInitial);
+    const nodesInitial = buildLogicalSections(parsedInitial, bytesInitial, mdInitial);
+    const targets = nodesInitial.filter(n => n.type === 'heading' && n.content.includes('Target'));
+    const targetNode = targets[1];
+    const token: AnchorPayloadV1 = {
+      version: 1,
+      fileKey: 'test.md',
+      sourceRevision: 'sha256:initial',
+      range: targetNode.range,
+      rawHash: targetNode.rawHash,
+      nodeType: targetNode.type,
+      structuralPath: targetNode.structuralPath,
+      structuralEvidence: {
+        pathFingerprint: getPathFingerprint(targetNode.structuralPath),
+        parentFingerprint: nodesInitial.find(n => n.runtimeId === targetNode.parentRuntimeId)?.rawHash,
+        siblingOccurrence: 2
+      },
+      dialect: 'commonmark+gfm',
+      issuedAt: Date.now()
+    };
+    const mdCurrent = `# Section A\n## Target\n## Target\n`;
+    const bytesCurrent = new TextEncoder().encode(mdCurrent);
+    const parsedCurrent = parseMarkdownToNodes(bytesCurrent, mdCurrent);
+    const nodesCurrent = buildLogicalSections(parsedCurrent, bytesCurrent, mdCurrent);
+    const relocated = relocateNode(token, nodesCurrent, bytesCurrent.length);
+    expect(relocated).not.toBeNull();
+    const currentTargets = nodesCurrent.filter(n => n.type === 'heading' && n.content.includes('Target'));
+    expect(relocated!.range.start).toBe(currentTargets[1].range.start);
+  });
+
+  it('successfully relocates duplicate headings in the same parent even if siblingOccurrence is undefined, thanks to tuple path fingerprint', () => {
+    const mdInitial = `# Section A\n## Target\n## Target\n`;
+    const bytesInitial = new TextEncoder().encode(mdInitial);
+    const parsedInitial = parseMarkdownToNodes(bytesInitial, mdInitial);
+    const nodesInitial = buildLogicalSections(parsedInitial, bytesInitial, mdInitial);
+    const targetNode = nodesInitial.filter(n => n.type === 'heading' && n.content.includes('Target'))[0];
+    const token: AnchorPayloadV1 = {
+      version: 1,
+      fileKey: 'test.md',
+      sourceRevision: 'sha256:initial',
+      range: targetNode.range,
+      rawHash: targetNode.rawHash,
+      nodeType: targetNode.type,
+      structuralPath: targetNode.structuralPath,
+      structuralEvidence: {
+        pathFingerprint: getPathFingerprint(targetNode.structuralPath),
+        parentFingerprint: nodesInitial.find(n => n.runtimeId === targetNode.parentRuntimeId)?.rawHash,
+        siblingOccurrence: undefined
+      },
+      dialect: 'commonmark+gfm',
+      issuedAt: Date.now()
+    };
+    const mdCurrent = `# Section A\n## Target\n## Target\n`;
+    const bytesCurrent = new TextEncoder().encode(mdCurrent);
+    const parsedCurrent = parseMarkdownToNodes(bytesCurrent, mdCurrent);
+    const nodesCurrent = buildLogicalSections(parsedCurrent, bytesCurrent, mdCurrent);
+    const relocated = relocateNode(token, nodesCurrent, bytesCurrent.length);
+    expect(relocated).not.toBeNull();
+  });
+
+  it('relocates a nested list item when shifts occur around it', () => {
+    const mdInitial = `- A\n  - B\n  - C\n`;
+    const bytesInitial = new TextEncoder().encode(mdInitial);
+    const parsedInitial = parseMarkdownToNodes(bytesInitial, mdInitial);
+    const nodesInitial = buildLogicalSections(parsedInitial, bytesInitial, mdInitial);
+    const targetNode = nodesInitial.find(n => n.type === 'list_item' && n.content.trim() === '- C')!;
+    const token: AnchorPayloadV1 = {
+      version: 1,
+      fileKey: 'test.md',
+      sourceRevision: 'sha256:initial',
+      range: targetNode.range,
+      rawHash: targetNode.rawHash,
+      nodeType: targetNode.type,
+      structuralPath: targetNode.structuralPath,
+      structuralEvidence: {
+        pathFingerprint: getPathFingerprint(targetNode.structuralPath),
+        parentFingerprint: nodesInitial.find(n => n.runtimeId === targetNode.parentRuntimeId)?.rawHash,
+        siblingOccurrence: 2
+      },
+      dialect: 'commonmark+gfm',
+      issuedAt: Date.now()
+    };
+    const mdCurrent = `- A\n  - PREPENDED\n  - B\n  - C\n`;
+    const bytesCurrent = new TextEncoder().encode(mdCurrent);
+    const parsedCurrent = parseMarkdownToNodes(bytesCurrent, mdCurrent);
+    const nodesCurrent = buildLogicalSections(parsedCurrent, bytesCurrent, mdCurrent);
+    const relocated = relocateNode(token, nodesCurrent, bytesCurrent.length);
+    expect(relocated).not.toBeNull();
+    expect(relocated!.content.trim()).toBe('- C');
+  });
+
+  it('relocates nodes successfully in files with CRLF line endings', () => {
+    const mdInitial = `# Header\r\nParagraph CRLF\r\n`;
+    const bytesInitial = new TextEncoder().encode(mdInitial);
+    const parsedInitial = parseMarkdownToNodes(bytesInitial, mdInitial);
+    const nodesInitial = buildLogicalSections(parsedInitial, bytesInitial, mdInitial);
+    const targetNode = nodesInitial.find(n => n.type === 'paragraph')!;
+    const token: AnchorPayloadV1 = {
+      version: 1,
+      fileKey: 'test.md',
+      sourceRevision: 'sha256:initial',
+      range: targetNode.range,
+      rawHash: targetNode.rawHash,
+      nodeType: targetNode.type,
+      structuralPath: targetNode.structuralPath,
+      structuralEvidence: {
+        pathFingerprint: getPathFingerprint(targetNode.structuralPath),
+        parentFingerprint: nodesInitial.find(n => n.runtimeId === targetNode.parentRuntimeId)?.rawHash,
+        siblingOccurrence: 1
+      },
+      dialect: 'commonmark+gfm',
+      issuedAt: Date.now()
+    };
+    const mdCurrent = `# Header\r\nPrepended\r\n\r\nParagraph CRLF\r\n`;
+    const bytesCurrent = new TextEncoder().encode(mdCurrent);
+    const parsedCurrent = parseMarkdownToNodes(bytesCurrent, mdCurrent);
+    const nodesCurrent = buildLogicalSections(parsedCurrent, bytesCurrent, mdCurrent);
+    const relocated = relocateNode(token, nodesCurrent, bytesCurrent.length);
+    expect(relocated).not.toBeNull();
+    expect(relocated!.content).toBe('Paragraph CRLF');
+  });
+
+  it('relocates nodes containing CJK text and Emojis', () => {
+    const mdInitial = `# 🌟 标题\n测试段落 🌸\n`;
+    const bytesInitial = new TextEncoder().encode(mdInitial);
+    const parsedInitial = parseMarkdownToNodes(bytesInitial, mdInitial);
+    const nodesInitial = buildLogicalSections(parsedInitial, bytesInitial, mdInitial);
+    const targetNode = nodesInitial.find(n => n.type === 'paragraph')!;
+    const token: AnchorPayloadV1 = {
+      version: 1,
+      fileKey: 'test.md',
+      sourceRevision: 'sha256:initial',
+      range: targetNode.range,
+      rawHash: targetNode.rawHash,
+      nodeType: targetNode.type,
+      structuralPath: targetNode.structuralPath,
+      structuralEvidence: {
+        pathFingerprint: getPathFingerprint(targetNode.structuralPath),
+        parentFingerprint: nodesInitial.find(n => n.runtimeId === targetNode.parentRuntimeId)?.rawHash,
+        siblingOccurrence: 1
+      },
+      dialect: 'commonmark+gfm',
+      issuedAt: Date.now()
+    };
+    const mdCurrent = `# 🌟 标题\n新插入的内容\n\n测试段落 🌸\n`;
+    const bytesCurrent = new TextEncoder().encode(mdCurrent);
+    const parsedCurrent = parseMarkdownToNodes(bytesCurrent, mdCurrent);
+    const nodesCurrent = buildLogicalSections(parsedCurrent, bytesCurrent, mdCurrent);
+    const relocated = relocateNode(token, nodesCurrent, bytesCurrent.length);
+    expect(relocated).not.toBeNull();
+    expect(relocated!.content).toBe('测试段落 🌸');
+  });
+
+  it('rejects relocation if structural evidence is entirely missing in the token', () => {
+    const mdInitial = `# Section\nParagraph\n`;
+    const bytesInitial = new TextEncoder().encode(mdInitial);
+    const parsedInitial = parseMarkdownToNodes(bytesInitial, mdInitial);
+    const nodesInitial = buildLogicalSections(parsedInitial, bytesInitial, mdInitial);
+    const targetNode = nodesInitial.find(n => n.type === 'paragraph')!;
+    const token: AnchorPayloadV1 = {
+      version: 1,
+      fileKey: 'test.md',
+      sourceRevision: 'sha256:initial',
+      range: targetNode.range,
+      rawHash: targetNode.rawHash,
+      nodeType: targetNode.type,
+      structuralPath: targetNode.structuralPath,
+      dialect: 'commonmark+gfm',
+      issuedAt: Date.now()
+    };
+    const mdCurrent = `# Section\nUnrelated\n\nParagraph\n`;
+    const bytesCurrent = new TextEncoder().encode(mdCurrent);
+    const parsedCurrent = parseMarkdownToNodes(bytesCurrent, mdCurrent);
+    const nodesCurrent = buildLogicalSections(parsedCurrent, bytesCurrent, mdCurrent);
+    const relocated = relocateNode(token, nodesCurrent, bytesCurrent.length);
+    expect(relocated).toBeNull();
+  });
+
+  it('rejects relocation if structural evidence score is below the threshold', () => {
+    const mdInitial = `# Old Section\nParagraph\n`;
+    const bytesInitial = new TextEncoder().encode(mdInitial);
+    const parsedInitial = parseMarkdownToNodes(bytesInitial, mdInitial);
+    const nodesInitial = buildLogicalSections(parsedInitial, bytesInitial, mdInitial);
+    const targetNode = nodesInitial.find(n => n.type === 'paragraph')!;
+    const token: AnchorPayloadV1 = {
+      version: 1,
+      fileKey: 'test.md',
+      sourceRevision: 'sha256:initial',
+      range: targetNode.range,
+      rawHash: targetNode.rawHash,
+      nodeType: targetNode.type,
+      structuralPath: targetNode.structuralPath,
+      structuralEvidence: {
+        pathFingerprint: getPathFingerprint([{ heading: 'Some Other Section', level: 1, occurrence: 1 }]),
+        parentFingerprint: 'sha256:mismatchedparent',
+        siblingOccurrence: 5
+      },
+      dialect: 'commonmark+gfm',
+      issuedAt: Date.now()
+    };
+    const mdCurrent = `# New Section\nParagraph\n`;
+    const bytesCurrent = new TextEncoder().encode(mdCurrent);
+    const parsedCurrent = parseMarkdownToNodes(bytesCurrent, mdCurrent);
+    const nodesCurrent = buildLogicalSections(parsedCurrent, bytesCurrent, mdCurrent);
+    const relocated = relocateNode(token, nodesCurrent, bytesCurrent.length);
+    expect(relocated).toBeNull();
+  });
+
+  it('rejects relocation if multiple candidates have the same highest structural score', () => {
+    const mdInitial = `# Section\nParagraph\n`;
+    const bytesInitial = new TextEncoder().encode(mdInitial);
+    const parsedInitial = parseMarkdownToNodes(bytesInitial, mdInitial);
+    const nodesInitial = buildLogicalSections(parsedInitial, bytesInitial, mdInitial);
+    const targetNode = nodesInitial.find(n => n.type === 'paragraph')!;
+    const token: AnchorPayloadV1 = {
+      version: 1,
+      fileKey: 'test.md',
+      sourceRevision: 'sha256:initial',
+      range: targetNode.range,
+      rawHash: targetNode.rawHash,
+      nodeType: targetNode.type,
+      structuralPath: targetNode.structuralPath,
+      structuralEvidence: {
+        pathFingerprint: getPathFingerprint(targetNode.structuralPath),
+        parentFingerprint: nodesInitial.find(n => n.runtimeId === targetNode.parentRuntimeId)?.rawHash,
+        siblingOccurrence: 1
+      },
+      dialect: 'commonmark+gfm',
+      issuedAt: Date.now()
+    };
+    const mdCurrent = `# Section\nParagraph\nParagraph\n`;
+    const bytesCurrent = new TextEncoder().encode(mdCurrent);
+    const parsedCurrent = parseMarkdownToNodes(bytesCurrent, mdCurrent);
+    const nodesCurrent = buildLogicalSections(parsedCurrent, bytesCurrent, mdCurrent);
+    const relocated = relocateNode(token, nodesCurrent, bytesCurrent.length);
+    expect(relocated).toBeNull();
+  });
+
+  it('relocates paragraph when a new section is prepended, shifting index/distance', () => {
+    const mdInitial = `# Title\nParagraph text.\n`;
+    const bytesInitial = new TextEncoder().encode(mdInitial);
+    const parsedInitial = parseMarkdownToNodes(bytesInitial, mdInitial);
+    const nodesInitial = buildLogicalSections(parsedInitial, bytesInitial, mdInitial);
+    const targetNode = nodesInitial.find(n => n.type === 'paragraph')!;
+    const token: AnchorPayloadV1 = {
+      version: 1,
+      fileKey: 'test.md',
+      sourceRevision: 'sha256:initial',
+      range: targetNode.range,
+      rawHash: targetNode.rawHash,
+      nodeType: targetNode.type,
+      structuralPath: targetNode.structuralPath,
+      structuralEvidence: {
+        pathFingerprint: getPathFingerprint(targetNode.structuralPath),
+        parentFingerprint: nodesInitial.find(n => n.runtimeId === targetNode.parentRuntimeId)?.rawHash,
+        siblingOccurrence: 1
+      },
+      dialect: 'commonmark+gfm',
+      issuedAt: Date.now()
+    };
+    const mdCurrent = `# Preface\nIntroductory remarks.\n\n# Title\nParagraph text.\n`;
+    const bytesCurrent = new TextEncoder().encode(mdCurrent);
+    const parsedCurrent = parseMarkdownToNodes(bytesCurrent, mdCurrent);
+    const nodesCurrent = buildLogicalSections(parsedCurrent, bytesCurrent, mdCurrent);
+    const relocated = relocateNode(token, nodesCurrent, bytesCurrent.length);
+    expect(relocated).not.toBeNull();
+    expect(relocated!.content).toBe('Paragraph text.');
+  });
+
+  it('relocates table row when the table header styling changes', () => {
+    const mdInitial = `| Col |\n|---|\n| Cell |\n`;
+    const bytesInitial = new TextEncoder().encode(mdInitial);
+    const parsedInitial = parseMarkdownToNodes(bytesInitial, mdInitial);
+    const nodesInitial = buildLogicalSections(parsedInitial, bytesInitial, mdInitial);
+    const targetNode = nodesInitial.find(n => n.content === '| Cell |')!;
+    const token: AnchorPayloadV1 = {
+      version: 1,
+      fileKey: 'test.md',
+      sourceRevision: 'sha256:initial',
+      range: targetNode.range,
+      rawHash: targetNode.rawHash,
+      nodeType: targetNode.type,
+      structuralPath: targetNode.structuralPath,
+      structuralEvidence: {
+        pathFingerprint: getPathFingerprint(targetNode.structuralPath),
+        parentFingerprint: nodesInitial.find(n => n.type === 'table')!.rawHash,
+        siblingOccurrence: 2
+      },
+      dialect: 'commonmark+gfm',
+      issuedAt: Date.now()
+    };
+    const mdCurrent = `| Col |\n| :--- |\n| Cell |\n`;
+    const bytesCurrent = new TextEncoder().encode(mdCurrent);
+    const parsedCurrent = parseMarkdownToNodes(bytesCurrent, mdCurrent);
+    const nodesCurrent = buildLogicalSections(parsedCurrent, bytesCurrent, mdCurrent);
+    const relocated = relocateNode(token, nodesCurrent, bytesCurrent.length);
+    expect(relocated).not.toBeNull();
+    expect(relocated!.content).toBe('| Cell |');
+  });
+
+  it('relocates code block when other code blocks are added', () => {
+    const mdInitial = `\`\`\`typescript\nconst x = 1;\n\`\`\`\n`;
+    const bytesInitial = new TextEncoder().encode(mdInitial);
+    const parsedInitial = parseMarkdownToNodes(bytesInitial, mdInitial);
+    const nodesInitial = buildLogicalSections(parsedInitial, bytesInitial, mdInitial);
+    const targetNode = nodesInitial.find(n => n.type === 'code_block')!;
+    const token: AnchorPayloadV1 = {
+      version: 1,
+      fileKey: 'test.md',
+      sourceRevision: 'sha256:initial',
+      range: targetNode.range,
+      rawHash: targetNode.rawHash,
+      nodeType: targetNode.type,
+      structuralPath: targetNode.structuralPath,
+      structuralEvidence: {
+        pathFingerprint: getPathFingerprint(targetNode.structuralPath),
+        siblingOccurrence: 1
+      },
+      dialect: 'commonmark+gfm',
+      issuedAt: Date.now()
+    };
+    const mdCurrent = `\`\`\`javascript\nconst x = 1;\n\`\`\`\n\n\`\`\`typescript\nconst x = 1;\n\`\`\`\n`;
+    const bytesCurrent = new TextEncoder().encode(mdCurrent);
+    const parsedCurrent = parseMarkdownToNodes(bytesCurrent, mdCurrent);
+    const nodesCurrent = buildLogicalSections(parsedCurrent, bytesCurrent, mdCurrent);
+    const relocated = relocateNode(token, nodesCurrent, bytesCurrent.length);
+    expect(relocated).not.toBeNull();
+    expect(relocated!.content).toContain('typescript');
+  });
+
+  it('relocates block and scores block ID matches correctly', () => {
+    const mdInitial = `Paragraph ^block-a\n`;
+    const bytesInitial = new TextEncoder().encode(mdInitial);
+    const parsedInitial = parseMarkdownToNodes(bytesInitial, mdInitial);
+    const nodesInitial = buildLogicalSections(parsedInitial, bytesInitial, mdInitial);
+    const targetNode = nodesInitial.find(n => n.type === 'paragraph')!;
+    const token: AnchorPayloadV1 = {
+      version: 1,
+      fileKey: 'test.md',
+      sourceRevision: 'sha256:initial',
+      range: targetNode.range,
+      rawHash: targetNode.rawHash,
+      nodeType: targetNode.type,
+      structuralPath: targetNode.structuralPath,
+      blockId: 'block-a',
+      structuralEvidence: {
+        pathFingerprint: getPathFingerprint(targetNode.structuralPath),
+        blockId: 'block-a'
+      },
+      dialect: 'commonmark+gfm',
+      issuedAt: Date.now()
+    };
+    const mdCurrent = `Paragraph ^block-b\n\nParagraph ^block-a\n`;
+    const bytesCurrent = new TextEncoder().encode(mdCurrent);
+    const parsedCurrent = parseMarkdownToNodes(bytesCurrent, mdCurrent);
+    const nodesCurrent = buildLogicalSections(parsedCurrent, bytesCurrent, mdCurrent);
+    const relocated = relocateNode(token, nodesCurrent, bytesCurrent.length);
+    expect(relocated).not.toBeNull();
+    expect(relocated!.blockId).toBe('block-a');
+  });
+
+  it('relocates frontmatter fields when ordering is modified', () => {
+    const mdInitial = `---\na: 1\nb: 2\n---\n`;
+    const bytesInitial = new TextEncoder().encode(mdInitial);
+    const parsedInitial = parseMarkdownToNodes(bytesInitial, mdInitial);
+    const nodesInitial = buildLogicalSections(parsedInitial, bytesInitial, mdInitial);
+    const targetNode = nodesInitial.find(n => n.content === 'b: 2')!;
+    const token: AnchorPayloadV1 = {
+      version: 1,
+      fileKey: 'test.md',
+      sourceRevision: 'sha256:initial',
+      range: targetNode.range,
+      rawHash: targetNode.rawHash,
+      nodeType: targetNode.type,
+      structuralPath: targetNode.structuralPath,
+      structuralEvidence: {
+        pathFingerprint: getPathFingerprint(targetNode.structuralPath),
+        parentFingerprint: nodesInitial.find(n => n.type === 'frontmatter')!.rawHash,
+        siblingOccurrence: 2
+      },
+      dialect: 'commonmark+gfm',
+      issuedAt: Date.now()
+    };
+    const mdCurrent = `---\nb: 2\na: 1\n---\n`;
+    const bytesCurrent = new TextEncoder().encode(mdCurrent);
+    const parsedCurrent = parseMarkdownToNodes(bytesCurrent, mdCurrent);
+    const nodesCurrent = buildLogicalSections(parsedCurrent, bytesCurrent, mdCurrent);
+    const relocated = relocateNode(token, nodesCurrent, bytesCurrent.length);
+    expect(relocated).not.toBeNull();
+    expect(relocated!.content).toBe('b: 2');
+  });
+
+  it('relocates list item inside shifted list hierarchies', () => {
+    const mdInitial = `- Parent 1\n  - Child 1\n- Parent 2\n  - Child 2\n`;
+    const bytesInitial = new TextEncoder().encode(mdInitial);
+    const parsedInitial = parseMarkdownToNodes(bytesInitial, mdInitial);
+    const nodesInitial = buildLogicalSections(parsedInitial, bytesInitial, mdInitial);
+    const targetNode = nodesInitial.find(n => n.type === 'list_item' && n.content.trim() === '- Child 1')!;
+    const token: AnchorPayloadV1 = {
+      version: 1,
+      fileKey: 'test.md',
+      sourceRevision: 'sha256:initial',
+      range: targetNode.range,
+      rawHash: targetNode.rawHash,
+      nodeType: targetNode.type,
+      structuralPath: targetNode.structuralPath,
+      structuralEvidence: {
+        pathFingerprint: getPathFingerprint(targetNode.structuralPath),
+        siblingOccurrence: 1
+      },
+      dialect: 'commonmark+gfm',
+      issuedAt: Date.now()
+    };
+    const mdCurrent = `- Prepended\n- Parent 1\n  - Child 1\n- Parent 2\n  - Child 2\n`;
+    const bytesCurrent = new TextEncoder().encode(mdCurrent);
+    const parsedCurrent = parseMarkdownToNodes(bytesCurrent, mdCurrent);
+    const nodesCurrent = buildLogicalSections(parsedCurrent, bytesCurrent, mdCurrent);
+    const relocated = relocateNode(token, nodesCurrent, bytesCurrent.length);
+    expect(relocated).not.toBeNull();
+    expect(relocated!.content.trim()).toBe('- Child 1');
   });
 });

@@ -3,40 +3,38 @@ import { AnchorPayloadV1 } from '@md-safeedit/protocol';
 import { MarkdownNode } from '../parser/parser.js';
 
 /**
- * Searches for raw-identical candidates in the parsed node tree and ranks them using structural scoring.
- * Returns the relocated node on a high-confidence unique match, or null on mismatch/ambiguity.
+ * Returns a deterministic serialized string for the structural path segments
  */
-export function relocateNode(
+export function getPathFingerprint(path: { heading: string; level: number; occurrence: number }[]): string {
+  return JSON.stringify(path.map(s => [s.heading, s.level, s.occurrence]));
+}
+
+interface ScoredCandidate {
+  node: MarkdownNode;
+  structuralScore: number;
+  score: number;
+}
+
+/**
+ * Helper to compute structural score for candidate nodes
+ */
+function scoreCandidates(
   token: AnchorPayloadV1,
+  candidates: MarkdownNode[],
   currentNodes: MarkdownNode[],
   docLength: number
-): MarkdownNode | null {
-  // 1. Filter nodes of the same type
-  const sameTypeNodes = currentNodes.filter(n => n.type === token.nodeType);
-
-  // 2. Keep only nodes with the same raw content hash
-  const candidates = sameTypeNodes.filter(n => n.rawHash === token.rawHash);
-
-  if (candidates.length === 0) {
-    return null;
-  }
-
-  // Relocation requires Phase 2 structuralEvidence to be present in token
+): ScoredCandidate[] {
   if (!token.structuralEvidence) {
-    // Fallback: If there's exactly 1 raw-identical candidate, we can relocate it safely
-    if (candidates.length === 1) {
-      return candidates[0];
-    }
-    return null;
+    return [];
   }
 
   const evidence = token.structuralEvidence;
 
-  const scoredCandidates = candidates.map(candidate => {
+  return candidates.map(candidate => {
     let score = 0;
 
     // A. Path fingerprint match (+25)
-    const pathFP = candidate.structuralPath.map(s => s.heading).join('/');
+    const pathFP = getPathFingerprint(candidate.structuralPath);
     if (pathFP === evidence.pathFingerprint) {
       score += 25;
     }
@@ -117,6 +115,33 @@ export function relocateNode(
       score
     };
   });
+}
+
+/**
+ * Searches for raw-identical candidates in the parsed node tree and ranks them using structural scoring.
+ * Returns the relocated node on a high-confidence unique match, or null on mismatch/ambiguity.
+ */
+export function relocateNode(
+  token: AnchorPayloadV1,
+  currentNodes: MarkdownNode[],
+  docLength: number
+): MarkdownNode | null {
+  // 1. Filter nodes of the same type
+  const sameTypeNodes = currentNodes.filter(n => n.type === token.nodeType);
+
+  // 2. Keep only nodes with the same raw content hash
+  const candidates = sameTypeNodes.filter(n => n.rawHash === token.rawHash);
+
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  // Relocation requires Phase 2 structuralEvidence to be present in token
+  if (!token.structuralEvidence) {
+    return null;
+  }
+
+  const scoredCandidates = scoreCandidates(token, candidates, currentNodes, docLength);
 
   // Sort candidates by structuralScore descending first, and use total score (which includes distance) only as a tie-breaker
   scoredCandidates.sort((a, b) => {
@@ -130,7 +155,7 @@ export function relocateNode(
   const threshold = 25;
   const best = scoredCandidates[0];
 
-  if (best.structuralScore < threshold) {
+  if (!best || best.structuralScore < threshold) {
     return null;
   }
 
@@ -142,3 +167,44 @@ export function relocateNode(
 
   return best.node;
 }
+
+/**
+ * Explains why relocation failed for candidates, returns stable error code
+ */
+export function explainRelocationFailure(
+  token: AnchorPayloadV1,
+  candidates: MarkdownNode[],
+  currentNodes: MarkdownNode[],
+  docLength: number
+): 'ANCHOR_AMBIGUOUS' | 'ANCHOR_INSUFFICIENT_EVIDENCE' {
+  if (!token.structuralEvidence) {
+    return 'ANCHOR_INSUFFICIENT_EVIDENCE';
+  }
+
+  const scoredCandidates = scoreCandidates(token, candidates, currentNodes, docLength);
+  if (scoredCandidates.length === 0) {
+    return 'ANCHOR_INSUFFICIENT_EVIDENCE';
+  }
+
+  scoredCandidates.sort((a, b) => {
+    if (Math.abs(b.structuralScore - a.structuralScore) >= 0.001) {
+      return b.structuralScore - a.structuralScore;
+    }
+    return b.score - a.score;
+  });
+
+  const threshold = 25;
+  const best = scoredCandidates[0];
+
+  if (!best || best.structuralScore < threshold) {
+    return 'ANCHOR_INSUFFICIENT_EVIDENCE';
+  }
+
+  const hasStructuralTie = scoredCandidates.slice(1).some(c => Math.abs(c.structuralScore - best.structuralScore) < 0.001);
+  if (hasStructuralTie) {
+    return 'ANCHOR_AMBIGUOUS';
+  }
+
+  return 'ANCHOR_AMBIGUOUS';
+}
+

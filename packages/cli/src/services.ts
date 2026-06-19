@@ -12,7 +12,9 @@ import {
   parseMarkdownToNodes, 
   buildLogicalSections, 
   MarkdownNode,
-  relocateNode
+  relocateNode,
+  getPathFingerprint,
+  explainRelocationFailure
 } from '@md-safeedit/markdown';
 import { 
   verifyToken, 
@@ -52,6 +54,10 @@ export function formatError(code: string, message: string, details?: any): { ok:
     case 'ANCHOR_AMBIGUOUS':
       retryable = false;
       recommended_action = 'Multiple identical candidates found. Refine your query or select a more specific section.';
+      break;
+    case 'ANCHOR_INSUFFICIENT_EVIDENCE':
+      retryable = false;
+      recommended_action = 'The anchor has insufficient structural evidence to authorize relocation. Re-read the node and generate a new token.';
       break;
     case 'ANCHOR_INVALID':
       retryable = false;
@@ -292,7 +298,7 @@ export function readService(request: ReadRequest, allowedRoots: string[]) {
       }
 
       // Generate structuralEvidence
-      const pathFingerprint = node.structuralPath.map(s => s.heading).join('/');
+      const pathFingerprint = getPathFingerprint(node.structuralPath);
       
       let parentFingerprint: string | undefined;
       let previousFingerprint: string | undefined;
@@ -431,13 +437,20 @@ export function patchService(request: PatchRequest, allowedRoots: string[]) {
 
           if (candidates.length === 0) {
             const pathFP = payload.structuralEvidence?.pathFingerprint;
-            const changedNode = sameTypeNodes.find(n => n.structuralPath.map(s => s.heading).join('/') === pathFP);
+            const changedNode = sameTypeNodes.find(n => getPathFingerprint(n.structuralPath) === pathFP);
             if (changedNode) {
               return formatError('TARGET_CHANGED', 'Target content has been modified.', { operation_index: i });
             }
             return formatError('TARGET_MISSING', 'Target node could not be found.', { operation_index: i });
           } else {
-            return formatError('ANCHOR_AMBIGUOUS', 'Multiple candidates match the target description. Relocation is ambiguous.', { operation_index: i });
+            const failureCode = explainRelocationFailure(payload, candidates, nodes, snapshot.bytes.length);
+            const message = failureCode === 'ANCHOR_AMBIGUOUS'
+              ? 'Multiple candidates match the target description. Relocation is ambiguous.'
+              : 'The anchor has insufficient structural evidence to authorize relocation.';
+            return formatError(failureCode, message, { 
+              operation_index: i,
+              candidate_count: candidates.length
+            });
           }
         }
         
