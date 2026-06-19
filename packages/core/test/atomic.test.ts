@@ -4,6 +4,12 @@ import * as fs from 'fs';
 import * as crypto from 'crypto';
 import { atomicWriteFile } from '../src/writer/atomic.js';
 
+// Keep a reference to the real (un-mocked) fs for use in test teardown.
+// vi.mock replaces the module-level `fs`, so afterEach must use this reference
+// to avoid hitting the mocked rmSync which causes EPERM on Windows.
+import { createRequire } from 'module';
+const realFs: typeof import('fs') = createRequire(import.meta.url)('fs');
+
 vi.mock('fs', async () => {
   const actual = await vi.importActual<any>('fs');
   return {
@@ -28,8 +34,10 @@ describe('Atomic File Writer', () => {
   });
 
   afterEach(() => {
-    if (fs.existsSync(tempDir)) {
-      fs.rmSync(tempDir, { recursive: true, force: true });
+    // Use the real (un-mocked) fs to clean up so that Windows does not get
+    // EPERM from the vi.mock proxy intercepting rmSync.
+    if (realFs.existsSync(tempDir)) {
+      realFs.rmSync(tempDir, { recursive: true, force: true });
     }
   });
 
