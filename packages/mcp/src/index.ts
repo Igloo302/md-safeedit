@@ -40,7 +40,7 @@ const server = new Server(
 const TOOLS = [
   {
     name: 'inspect',
-    description: 'Inspect a Markdown file outline, dialect, line endings, size, and revision.',
+    description: 'Get the structural outline headings of a Markdown file. MUST use this tool first when you want to modify, understand, or edit a Markdown document, to locate target nodes by their runtime_id before reading or patching.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -64,7 +64,7 @@ const TOOLS = [
   },
   {
     name: 'search',
-    description: 'Search for text patterns inside a Markdown file, scoped by structural nodes or heading paths.',
+    description: 'Search for text patterns inside a Markdown file, returning matching AST logical nodes. Use this to quickly find specific sections, list items, or tables to edit in a large Markdown document without reading the entire file.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -108,7 +108,7 @@ const TOOLS = [
   },
   {
     name: 'read',
-    description: 'Read contents of specified nodes and acquire signed anchor tokens for mutation.',
+    description: 'Read the contents of specific Markdown nodes by their runtime_id and acquire cryptographically signed anchor_tokens. You MUST call this tool to read the node before applying any patch, as the patch tool requires the anchor_token returned here.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -142,7 +142,7 @@ const TOOLS = [
   },
   {
     name: 'patch',
-    description: 'Safely edit node contents using issued anchor tokens. Supports atomic execution and dry runs.',
+    description: 'Safely edit (replace, delete, insert) Markdown node contents using signed anchor_tokens. This is the ONLY authorized way to modify Markdown files, preventing silent overwrites and concurrent conflicts. Do NOT use generic write_file or edit_file tools for Markdown files.',
     inputSchema: {
       type: 'object',
       properties: {
