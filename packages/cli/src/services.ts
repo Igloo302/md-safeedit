@@ -87,7 +87,7 @@ export function formatError(code: string, message: string, details?: any): { ok:
       break;
     default:
       retryable = false;
-      recommended_action = 'Check the request content or syntax.';
+      recommended_action = `Unexpected error code "${code}". Check the request content or report a bug if the code is unrecognised.`;
   }
 
   return {
@@ -199,8 +199,17 @@ export function searchService(request: SearchRequest, allowedRoots: string[]) {
         const matchIdx = contentLower.indexOf(query);
         if (matchIdx === -1) return null;
 
-        const limit = request.options?.preview_chars || 160;
-        const preview = n.content.length > limit ? n.content.slice(0, limit) + '...' : n.content;
+        const halfWindow = Math.floor((request.options?.preview_chars || 160) / 2);
+        // Build a match-centred preview so match_ranges always fall within the preview string
+        const previewStart = Math.max(0, matchIdx - halfWindow);
+        const previewEnd = Math.min(n.content.length, matchIdx + query.length + halfWindow);
+        const rawPreview = n.content.slice(previewStart, previewEnd);
+        const prefix = previewStart > 0 ? '...' : '';
+        const suffix = previewEnd < n.content.length ? '...' : '';
+        const preview = prefix + rawPreview + suffix;
+        // match_ranges are relative to the preview string
+        const previewMatchStart = prefix.length + (matchIdx - previewStart);
+        const previewMatchEnd = previewMatchStart + query.length;
 
         return {
           runtime_id: n.runtimeId,
@@ -212,8 +221,8 @@ export function searchService(request: SearchRequest, allowedRoots: string[]) {
           })),
           preview,
           match_ranges: [{
-            start: matchIdx,
-            end: matchIdx + query.length
+            start: previewMatchStart,
+            end: previewMatchEnd
           }]
         };
       })
@@ -341,7 +350,7 @@ export function readService(request: ReadRequest, allowedRoots: string[]) {
         blockId: node.blockId,
         dialect: 'commonmark+gfm',
         issuedAt: Date.now(),
-        expiresAt: Date.now() + 600000 // 10 minutes expiry
+        expiresAt: Date.now() + (parseInt(process.env.MDSE_TOKEN_TTL_MS ?? '3600000', 10) || 3600000) // default 1 hour, configurable via MDSE_TOKEN_TTL_MS
       };
 
       const token = createToken(payload);
@@ -455,16 +464,24 @@ export function patchService(request: PatchRequest, allowedRoots: string[]) {
       let editOffset = startOffset;
       let editLength = endOffset - startOffset;
 
+      // Determine the document's line ending sequence for insert operations
+      const lineEnding = snapshot.lineEnding === 'crlf' ? '\r\n' : '\n';
+
       if (op.op === 'replace') {
         replacement = new TextEncoder().encode(op.content);
       } else if (op.op === 'delete') {
         replacement = new Uint8Array(0);
       } else if (op.op === 'insert_before') {
-        replacement = new TextEncoder().encode(op.content);
+        // Ensure the inserted block-level content is separated from the existing node by a newline.
+        // If the caller has already included a trailing newline we don't double-add one.
+        const insertContent = op.content.endsWith('\n') ? op.content : op.content + lineEnding;
+        replacement = new TextEncoder().encode(insertContent);
         editOffset = startOffset;
         editLength = 0;
       } else { // insert_after
-        replacement = new TextEncoder().encode(op.content);
+        // Ensure the inserted block-level content is separated from the existing node by a newline.
+        const insertContent = op.content.startsWith('\n') ? op.content : lineEnding + op.content;
+        replacement = new TextEncoder().encode(insertContent);
         editOffset = endOffset;
         editLength = 0;
       }

@@ -228,8 +228,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     }
   } catch (err: any) {
     let errMsg = err.message || 'An unexpected error occurred.';
-    if (err.name === 'ZodError') {
-      errMsg = `Request validation failed: ${err.message}`;
+    if (err.name === 'ZodError' && Array.isArray(err.errors) && err.errors.length > 0) {
+      // Summarise only the first validation issue to keep the message concise
+      const first = err.errors[0];
+      const fieldPath = first.path?.length ? ` at "${first.path.join('.')}"` : '';
+      errMsg = `Request validation failed${fieldPath}: ${first.message}`;
     }
     return {
       content: [{ type: 'text', text: JSON.stringify(formatError('VALIDATION_FAILED', errMsg), null, 2) }],

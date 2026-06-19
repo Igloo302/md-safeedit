@@ -136,15 +136,17 @@ export function createSnapshot(targetPath: string, allowedRoots: string[]): Docu
  * Helper class to map between JS character offsets and UTF-8 byte offsets.
  */
 export class OffsetMapper {
-  private charToByte: Int32Array;
-  private byteToChar: Int32Array;
+  private charToByte: Float64Array;
+  private byteToChar: Float64Array;
 
   constructor(bytes: Uint8Array, str: string) {
     // Account for potential BOM offset in raw bytes relative to decoded string
     const bomOffset = bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf ? 3 : 0;
     
-    this.charToByte = new Int32Array(str.length + 1);
-    this.byteToChar = new Int32Array(bytes.length + 1 - bomOffset);
+    // Float64Array is used instead of Int32Array to avoid silent integer overflow
+    // on very large files (Int32Array max ~2.1 GB). Float64 safely handles up to 2^53 bytes.
+    this.charToByte = new Float64Array(str.length + 1);
+    this.byteToChar = new Float64Array(bytes.length + 1 - bomOffset);
 
     let charIdx = 0;
     let byteIdx = 0;
@@ -183,7 +185,7 @@ export class OffsetMapper {
         this.charToByte[i] += bomOffset;
       }
       // Re-initialize byteToChar to include BOM
-      const newByteToChar = new Int32Array(bytes.length + 1);
+      const newByteToChar = new Float64Array(bytes.length + 1);
       for (let b = 0; b < bomOffset; b++) {
         newByteToChar[b] = 0;
       }
