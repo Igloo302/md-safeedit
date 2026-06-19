@@ -102,14 +102,14 @@ describe('OffsetMapper', () => {
 describe('path authorization', () => {
   it('authorizes valid paths inside allowed roots', () => {
     const root = process.cwd();
-    const target = path.join(root, 'package.json');
+    const target = path.join(root, 'README.md');
     const canonical = authorizeAndCanonicalizePath(target, [root]);
     expect(canonical).toBe(fs.realpathSync(target));
   });
 
   it('rejects path traversal outside allowed roots', () => {
     const root = path.join(process.cwd(), 'packages');
-    const target = path.join(process.cwd(), 'package.json'); // outside packages/
+    const target = path.join(process.cwd(), 'README.md'); // outside packages/
     expect(() => authorizeAndCanonicalizePath(target, [root])).toThrow(/outside the authorized roots/);
   });
 });

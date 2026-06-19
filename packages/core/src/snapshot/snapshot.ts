@@ -36,21 +36,65 @@ export function authorizeAndCanonicalizePath(targetPath: string, allowedRoots: s
     throw new Error('No allowed roots configured for path authorization.');
   }
 
+  // 1. Extension validation
+  const allowedExts = ['.md', '.markdown', '.mdown', '.mkd'];
+  const ext = path.extname(targetPath).toLowerCase();
+  if (!allowedExts.includes(ext)) {
+    throw new Error(`Access Denied: Unsupported file extension "${ext}". Only Markdown files (.md, .markdown, .mdown, .mkd) are allowed.`);
+  }
+
+  // 2. Reject symlinks at targetPath
+  try {
+    const lstat = fs.lstatSync(targetPath);
+    if (lstat.isSymbolicLink()) {
+      throw new Error(`Access Denied: Symbolic links are not allowed as target files: "${targetPath}".`);
+    }
+  } catch (err: any) {
+    if (err.message.includes('Access Denied')) {
+      throw err;
+    }
+    // ENOENT is fine (file doesn't exist yet)
+  }
+
+  // 3. Resolve canonical path
   let canonical: string;
   try {
     canonical = fs.realpathSync(targetPath);
   } catch (err) {
-    // If the file doesn't exist yet (e.g. for creation), canonicalize the parent directory
+    // If the file doesn't exist yet, canonicalize the parent directory
     const resolvedParent = fs.realpathSync(path.dirname(targetPath));
     canonical = path.join(resolvedParent, path.basename(targetPath));
   }
 
+  // 4. Reject directories, sockets, devices (if file exists)
+  try {
+    const stat = fs.statSync(canonical);
+    if (!stat.isFile()) {
+      throw new Error(`Access Denied: Target path is not a regular file (directory, socket, or device).`);
+    }
+  } catch (err: any) {
+    if (err.message.includes('Access Denied')) {
+      throw err;
+    }
+    // ENOENT is fine for creation
+  }
+
+  // 5. Allowed roots checks using path segments
   const isAllowed = allowedRoots.some(root => {
     try {
       const canonicalRoot = fs.realpathSync(root);
-      const relative = path.relative(canonicalRoot, canonical);
-      // If relative starts with '..' or is absolute, it's outside the root
-      return !relative.startsWith('..') && !path.isAbsolute(relative);
+      const isWindows = process.platform === 'win32';
+      const rootSegs = canonicalRoot.split(path.sep).filter(Boolean);
+      const targetSegs = canonical.split(path.sep).filter(Boolean);
+
+      // On Windows, handle case-insensitivity and drive letters (e.g. C:)
+      const equalSegs = (s1: string, s2: string) => isWindows ? s1.toLowerCase() === s2.toLowerCase() : s1 === s2;
+
+      if (targetSegs.length < rootSegs.length) return false;
+      for (let i = 0; i < rootSegs.length; i++) {
+        if (!equalSegs(rootSegs[i], targetSegs[i])) return false;
+      }
+      return true;
     } catch {
       return false;
     }
