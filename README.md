@@ -180,7 +180,7 @@ sequenceDiagram
 
 ## ⚖️ Benchmark & Performance Results
 
-We evaluated the core protocol against 4 common baseline strategies across **200 programmatic tasks** (testing safety, concurrency conflicts, and relocation) and a **real-world scale simulation** (measuring token efficiency).
+We evaluated the core protocol against 4 common baseline strategies across **200 programmatic tasks** (testing safety, concurrency conflicts, and relocation) and a **synthetic token scaling simulation** (measuring token efficiency).
 
 ### 1. Safety & Correctness (200 Tasks)
 
@@ -190,12 +190,12 @@ We evaluated the core protocol against 4 common baseline strategies across **200
 | **B2 (Exact String Replace)** | 70.7% | **0.0%** | Fails completely on duplicate strings (ambiguity). |
 | **B3 (Unified Diff)** | 77.9% | **33.3%** | Prone to fuzzy-matching corruption in similar sections. |
 | **B4 (Line-Hash Patch)** | 74.3% | **0.0%** | Fails on shifted offsets if lines before/after are added. |
-| **B5 (MD SafeEdit)** | **99.3%** | **0.0%** | **Guarantees zero silent overwrites and 100% correct edits.** |
+| **B5 (MD SafeEdit)** | **99.3%** | **0.0%** | **Achieved 0% FAR and 0% wrong-target writes in the project’s 200-task synthetic benchmark.** |
 
 * **Safe Edit Success Rate (SESR)**: The ratio of successfully applied patches to total valid patch requests. A valid patch request is one where the target node exists and is structurally identical to the original token's state, but may have shifted in position due to concurrent modifications in other parts of the document.
 * **False Accept Rate (FAR)**: The ratio of incorrectly allowed edits (silent overwrites) to total conflict/tamper test cases. A false acceptance occurs when a patch is committed despite the target node having been deleted/modified, or when the token has been tampered with or expired. FAR must remain strictly **0.0%** to guarantee edit safety.
 
-### 2. Token Efficiency (Real-World Scale Test)
+### 2. Token Efficiency (Synthetic Token Scaling Estimate)
 
 To verify how token consumption scales with file size, we simulated editing a single table row across three realistic document sizes (estimating tokens as `characters / 4`):
 

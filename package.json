@@ -6,10 +6,10 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build --workspaces",
+    "build": "tsc --build",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --build --noEmit"
   },
   "devDependencies": {
     "@types/node": "^25.9.3",
