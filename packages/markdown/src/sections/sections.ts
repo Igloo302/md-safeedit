@@ -1,5 +1,5 @@
 import * as crypto from 'crypto';
-import { ByteRange } from '@md-safeedit/core';
+import { ByteRange } from '@igloo302/core';
 import { MarkdownNode, StructuralPathSegment } from '../parser/parser.js';
 
 /**

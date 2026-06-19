@@ -1,5 +1,5 @@
-import { ByteRange } from '@md-safeedit/core';
-import { AnchorPayloadV1 } from '@md-safeedit/protocol';
+import { ByteRange } from '@igloo302/core';
+import { AnchorPayloadV1 } from '@igloo302/protocol';
 import { MarkdownNode } from '../parser/parser.js';
 
 /**

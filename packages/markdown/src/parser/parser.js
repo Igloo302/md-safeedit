@@ -4,7 +4,7 @@ import { gfmFromMarkdown } from 'mdast-util-gfm';
 import { frontmatter } from 'micromark-extension-frontmatter';
 import { frontmatterFromMarkdown } from 'mdast-util-frontmatter';
 import * as crypto from 'crypto';
-import { OffsetMapper } from '@md-safeedit/core';
+import { OffsetMapper } from '@igloo302/core';
 /**
  * Maps AST node type to internal NodeType.
  */

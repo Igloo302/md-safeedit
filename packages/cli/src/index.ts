@@ -6,7 +6,7 @@ import {
   SearchRequestSchema, 
   ReadRequestSchema, 
   PatchRequestSchema 
-} from '@md-safeedit/protocol';
+} from '@igloo302/protocol';
 import { 
   inspectService, 
   searchService, 

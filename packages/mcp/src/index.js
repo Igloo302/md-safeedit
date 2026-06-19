@@ -2,8 +2,8 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
-import { inspectService, searchService, readService, patchService, formatError } from '@md-safeedit/cli/services.js';
-import { InspectRequestSchema, SearchRequestSchema, ReadRequestSchema, PatchRequestSchema } from '@md-safeedit/protocol';
+import { inspectService, searchService, readService, patchService, formatError } from '@igloo302/cli/services.js';
+import { InspectRequestSchema, SearchRequestSchema, ReadRequestSchema, PatchRequestSchema } from '@igloo302/protocol';
 // Allowed roots configuration
 const envRoots = process.env.MDSE_ALLOWED_ROOTS;
 const allowedRoots = envRoots ? envRoots.split(',').map((r) => r.trim()) : [process.cwd()];

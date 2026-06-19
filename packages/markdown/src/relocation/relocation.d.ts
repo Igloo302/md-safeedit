@@ -1,4 +1,4 @@
-import { AnchorPayloadV1 } from '@md-safeedit/protocol';
+import { AnchorPayloadV1 } from '@igloo302/protocol';
 import { MarkdownNode } from '../parser/parser.js';
 /**
  * Searches for raw-identical candidates in the parsed node tree and ranks them using structural scoring.

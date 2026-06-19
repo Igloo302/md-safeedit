@@ -1,5 +1,5 @@
 {
-  "name": "@md-safeedit/core",
+  "name": "@igloo302/core",
   "version": "0.1.0-dev",
   "type": "module",
   "main": "./dist/index.js",

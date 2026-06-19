@@ -7,13 +7,13 @@ import {
   atomicWriteFile, 
   generateUnifiedDiff,
   ByteEdit
-} from '@md-safeedit/core';
+} from '@igloo302/core';
 import { 
   parseMarkdownToNodes, 
   buildLogicalSections, 
   MarkdownNode,
   relocateNode
-} from '@md-safeedit/markdown';
+} from '@igloo302/markdown';
 import { 
   verifyToken, 
   createToken, 
@@ -22,7 +22,7 @@ import {
   SearchRequest,
   ReadRequest,
   PatchRequest
-} from '@md-safeedit/protocol';
+} from '@igloo302/protocol';
 
 export interface ServiceError {
   code: string;

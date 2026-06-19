@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as crypto from 'crypto';
-import { generateUnifiedDiff } from '@md-safeedit/core';
-import { readService, patchService } from '@md-safeedit/cli/services.js';
+import { generateUnifiedDiff } from '@igloo302/core';
+import { readService, patchService } from '@igloo302/cli/services.js';
 /**
  * B1: Full-File Rewrite
  * Overwrites the entire file blindly with the planned content from the original snapshot.

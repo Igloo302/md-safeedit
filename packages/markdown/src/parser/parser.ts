@@ -5,7 +5,7 @@ import { frontmatter } from 'micromark-extension-frontmatter';
 import { frontmatterFromMarkdown } from 'mdast-util-frontmatter';
 import * as crypto from 'crypto';
 
-import { OffsetMapper, ByteRange } from '@md-safeedit/core';
+import { OffsetMapper, ByteRange } from '@igloo302/core';
 
 export type NodeType =
   | 'document'

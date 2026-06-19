@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { inspectService, searchService, readService, patchService } from '@md-safeedit/cli/services.js';
+import { inspectService, searchService, readService, patchService } from '@igloo302/cli/services.js';
 const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
 if (!apiKey) {
     console.error('Error: GEMINI_API_KEY or GOOGLE_API_KEY environment variable is required to run the evaluation.');

@@ -1,4 +1,4 @@
-import { InspectRequest, SearchRequest, ReadRequest, PatchRequest } from '@md-safeedit/protocol';
+import { InspectRequest, SearchRequest, ReadRequest, PatchRequest } from '@igloo302/protocol';
 export interface ServiceError {
     code: string;
     message: string;
@@ -24,7 +24,7 @@ export declare function inspectService(request: InspectRequest, allowedRoots: st
         revision: string;
         dialect: string;
         size_bytes: number;
-        line_ending: import("@md-safeedit/core").LineEnding;
+        line_ending: import("@igloo302/core").LineEnding;
     };
     outline: {
         runtime_id: string;
@@ -51,7 +51,7 @@ export declare function searchService(request: SearchRequest, allowedRoots: stri
     document_revision: string;
     matches: {
         runtime_id: string;
-        type: import("@md-safeedit/markdown").NodeType;
+        type: import("@igloo302/markdown").NodeType;
         path: {
             heading: string;
             level: number;

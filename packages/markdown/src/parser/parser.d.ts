@@ -1,4 +1,4 @@
-import { ByteRange } from '@md-safeedit/core';
+import { ByteRange } from '@igloo302/core';
 export type NodeType = 'document' | 'section' | 'heading' | 'paragraph' | 'list_item' | 'code_block' | 'table_row' | 'frontmatter' | 'frontmatter_field' | 'blockquote' | 'list' | 'table' | 'raw';
 export interface StructuralPathSegment {
     heading: string;

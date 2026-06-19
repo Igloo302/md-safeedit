@@ -1,7 +1,7 @@
 import * as crypto from 'crypto';
-import { createSnapshot, applyEdits, atomicWriteFile, generateUnifiedDiff } from '@md-safeedit/core';
-import { parseMarkdownToNodes, buildLogicalSections, relocateNode } from '@md-safeedit/markdown';
-import { verifyToken, createToken } from '@md-safeedit/protocol';
+import { createSnapshot, applyEdits, atomicWriteFile, generateUnifiedDiff } from '@igloo302/core';
+import { parseMarkdownToNodes, buildLogicalSections, relocateNode } from '@igloo302/markdown';
+import { verifyToken, createToken } from '@igloo302/protocol';
 export function formatError(code, message, details) {
     let retryable = false;
     let recommended_action = '';

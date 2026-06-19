@@ -85,16 +85,16 @@ export declare const SearchRequestSchema: z.ZodObject<{
             occurrence: number;
         }>, "many">>;
     }, "strip", z.ZodTypeAny, {
-        include_types?: ("paragraph" | "document" | "section" | "heading" | "list_item" | "code_block" | "table_row" | "frontmatter" | "blockquote" | "list" | "table" | "raw" | "frontmatter_field")[] | undefined;
-        exclude_types?: ("paragraph" | "document" | "section" | "heading" | "list_item" | "code_block" | "table_row" | "frontmatter" | "blockquote" | "list" | "table" | "raw" | "frontmatter_field")[] | undefined;
+        include_types?: ("paragraph" | "document" | "section" | "heading" | "list_item" | "code_block" | "table_row" | "frontmatter" | "frontmatter_field" | "blockquote" | "list" | "table" | "raw")[] | undefined;
+        exclude_types?: ("paragraph" | "document" | "section" | "heading" | "list_item" | "code_block" | "table_row" | "frontmatter" | "frontmatter_field" | "blockquote" | "list" | "table" | "raw")[] | undefined;
         under_path?: {
             heading: string;
             level: number;
             occurrence: number;
         }[] | undefined;
     }, {
-        include_types?: ("paragraph" | "document" | "section" | "heading" | "list_item" | "code_block" | "table_row" | "frontmatter" | "blockquote" | "list" | "table" | "raw" | "frontmatter_field")[] | undefined;
-        exclude_types?: ("paragraph" | "document" | "section" | "heading" | "list_item" | "code_block" | "table_row" | "frontmatter" | "blockquote" | "list" | "table" | "raw" | "frontmatter_field")[] | undefined;
+        include_types?: ("paragraph" | "document" | "section" | "heading" | "list_item" | "code_block" | "table_row" | "frontmatter" | "frontmatter_field" | "blockquote" | "list" | "table" | "raw")[] | undefined;
+        exclude_types?: ("paragraph" | "document" | "section" | "heading" | "list_item" | "code_block" | "table_row" | "frontmatter" | "frontmatter_field" | "blockquote" | "list" | "table" | "raw")[] | undefined;
         under_path?: {
             heading: string;
             level: number;
@@ -121,8 +121,8 @@ export declare const SearchRequestSchema: z.ZodObject<{
         preview_chars: number;
     };
     filters?: {
-        include_types?: ("paragraph" | "document" | "section" | "heading" | "list_item" | "code_block" | "table_row" | "frontmatter" | "blockquote" | "list" | "table" | "raw" | "frontmatter_field")[] | undefined;
-        exclude_types?: ("paragraph" | "document" | "section" | "heading" | "list_item" | "code_block" | "table_row" | "frontmatter" | "blockquote" | "list" | "table" | "raw" | "frontmatter_field")[] | undefined;
+        include_types?: ("paragraph" | "document" | "section" | "heading" | "list_item" | "code_block" | "table_row" | "frontmatter" | "frontmatter_field" | "blockquote" | "list" | "table" | "raw")[] | undefined;
+        exclude_types?: ("paragraph" | "document" | "section" | "heading" | "list_item" | "code_block" | "table_row" | "frontmatter" | "frontmatter_field" | "blockquote" | "list" | "table" | "raw")[] | undefined;
         under_path?: {
             heading: string;
             level: number;
@@ -139,8 +139,8 @@ export declare const SearchRequestSchema: z.ZodObject<{
         preview_chars?: number | undefined;
     } | undefined;
     filters?: {
-        include_types?: ("paragraph" | "document" | "section" | "heading" | "list_item" | "code_block" | "table_row" | "frontmatter" | "blockquote" | "list" | "table" | "raw" | "frontmatter_field")[] | undefined;
-        exclude_types?: ("paragraph" | "document" | "section" | "heading" | "list_item" | "code_block" | "table_row" | "frontmatter" | "blockquote" | "list" | "table" | "raw" | "frontmatter_field")[] | undefined;
+        include_types?: ("paragraph" | "document" | "section" | "heading" | "list_item" | "code_block" | "table_row" | "frontmatter" | "frontmatter_field" | "blockquote" | "list" | "table" | "raw")[] | undefined;
+        exclude_types?: ("paragraph" | "document" | "section" | "heading" | "list_item" | "code_block" | "table_row" | "frontmatter" | "frontmatter_field" | "blockquote" | "list" | "table" | "raw")[] | undefined;
         under_path?: {
             heading: string;
             level: number;

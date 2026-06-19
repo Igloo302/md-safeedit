@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { parseMarkdownToNodes } from '../src/parser/parser.js';
 import { buildLogicalSections } from '../src/sections/sections.js';
 import { relocateNode } from '../src/relocation/relocation.js';
-import { AnchorPayloadV1 } from '@md-safeedit/protocol';
+import { AnchorPayloadV1 } from '@igloo302/protocol';
 
 describe('Exact Relocation Scoring Engine', () => {
   it('relocates an unchanged paragraph when content is inserted before it', () => {
