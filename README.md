@@ -1,109 +1,20 @@
 # MD SafeEdit
 
-**Safe, precise Markdown editing for AI agents.**
+> **Safe, precise, structure-aware Markdown editing for AI coding agents.**
 
-MD SafeEdit helps AI agents update the right part of a Markdown document without silently overwriting changes made by people or other agents.
-
-## Why it exists
-
-AI agents can already edit Markdown with full-file rewrites, string replacement, or text patches. These approaches work well for many simple tasks, but become less reliable when:
-
-- the document is long or frequently updated;
-- similar text appears in several places;
-- a person edits the file after the agent reads it;
-- multiple agents work on the same document;
-- the requested change targets a section, list item, or table row rather than an arbitrary line range.
-
-MD SafeEdit gives agents a Markdown-aware way to inspect, locate, and modify content. Every write is guarded by evidence captured when the target was read. If the target has changed or can no longer be identified unambiguously, MD SafeEdit returns a conflict instead of guessing.
-
-## Core principles
-
-1. **Never silently overwrite changed content.**
-2. **Use Markdown structure to locate content, not as permission to overwrite it.**
-3. **Automatically relocate only content that is provably unchanged.**
-4. **Preserve every byte outside the intended edit range.**
-5. **Keep the agent-facing toolset small.**
-6. **Measure value against simpler editing tools.**
-
-## Initial capabilities
-
-- Inspect a Markdown document as an outline.
-- Search sections, list items, and table rows.
-- Read a node together with a guarded anchor.
-- Replace, insert, or delete content using that anchor.
-- Detect external file changes.
-- Relocate an unchanged node after surrounding content moves.
-- Preview changes as a diff.
-- Apply multiple non-overlapping edits atomically.
-- Preserve untouched formatting and line endings.
-
-## Example
-
-An agent first reads a table row:
-
-```json
-{
-  "content": "| Charging current | 1A |",
-  "anchor": {
-    "token": "mdse_a1_..."
-  }
-}
-```
-
-It then requests a guarded replacement:
-
-```json
-{
-  "operations": [
-    {
-      "op": "replace",
-      "anchor_token": "mdse_a1_...",
-      "content": "| Charging current | 2A |"
-    }
-  ],
-  "dry_run": true
-}
-```
-
-MD SafeEdit will:
-
-1. verify the file and target state;
-2. relocate the target only if its original bytes still exist uniquely;
-3. reject ambiguous or changed targets;
-4. return a preview diff;
-5. apply the change atomically when requested.
-
-## Project status & Benchmark Results
-
-MD SafeEdit is fully implemented, verified, and benchmarked! We evaluated the core protocol against 4 common baseline strategies across **200 programmatic tasks**:
-
-- **B1 (Full-File Rewrite)**: Blindly overwrites files (FAR = 100.0%, WTR = 35.7%).
-- **B2 (Exact String Replace)**: High ambiguity rejections (40 false rejections).
-- **B3 (Unified Diff)**: Prone to fuzzy-match corruption (FAR = 33.3%).
-- **B4 (Line-Hash Patch)**: Fails completely on shifted offsets (20 false rejections).
-- **B5 (MD SafeEdit)**: **100% Safe Edit Success Rate (SESR)** and **0.0% False Accept Rate (FAR)** (0 false accepts, 0 wrong target writes).
-
-See the full [Benchmark Report](packages/benchmark/REPORT.md).
-
-## Getting Started
-
-MD SafeEdit can be used in two ways:
-1. **As an End User** (e.g., running the MCP Server for Cursor/Claude Desktop, or using the CLI) — **No source code clone required!** You can run or install it directly via NPM.
-2. **As a Contributor / Developer** (building from source, running tests, or running the benchmark) — Clone this GitHub repository and build locally.
+MD SafeEdit provides a reference implementation of a **Markdown-aware guarded patch protocol** for AI agents. It protects files from silent overwrites, handles content relocation when surrounding lines move, and ensures byte-for-byte fidelity of untouched parts.
 
 ---
 
-## 1. For End Users (MCP & CLI)
+## 🚀 Quick Start (MCP & CLI)
 
-You do **not** need to clone this repository. Ensure you have Node.js (LTS version recommended) and npm installed.
+You do **not** need to clone this repository to use MD SafeEdit. You can install or run it directly via NPM.
 
-### Option A: Using the MCP Server in AI Coding Assistants
+### A. Run as an MCP Server (Cursor & Claude Desktop)
+MD SafeEdit implements the Model Context Protocol (MCP), allowing AI coding assistants to automatically inspect, search, and safely update Markdown files using guarded patches.
 
-MD SafeEdit can run as a Model Context Protocol (MCP) server, allowing AI coding assistants like **Cursor**, **Claude Desktop**, or **Windsurf** to safely read and edit Markdown files using the signature-guarded CAS patch protocol.
-
-#### Configure in Claude Desktop
-
-Add the following configuration to your Claude Desktop configuration file (typically `~/Library/Application Support/Claude/claude_desktop_config.json` on macOS, or `%APPDATA%\Claude\claude_desktop_config.json` on Windows):
+#### 1. Claude Desktop
+Add the following to your Claude Desktop configuration file (typically `~/Library/Application Support/Claude/claude_desktop_config.json` on macOS, or `%APPDATA%\Claude\claude_desktop_config.json` on Windows):
 
 ```json
 {
@@ -115,7 +26,7 @@ Add the following configuration to your Claude Desktop configuration file (typic
         "@md-safeedit/mcp@dev"
       ],
       "env": {
-        "MDSE_ALLOWED_ROOTS": "/absolute/path/to/your/project"
+        "MDSE_ALLOWED_ROOTS": "/absolute/path/to/your/workspace"
       }
     }
   }
@@ -123,73 +34,137 @@ Add the following configuration to your Claude Desktop configuration file (typic
 ```
 
 > [!IMPORTANT]
-> - Replace `/absolute/path/to/your/project` with your actual workspace root directory.
+> - Replace `/absolute/path/to/your/workspace` with your actual workspace root directory.
 > - For security, the MCP server restricts files it can read or write to directories specified in `MDSE_ALLOWED_ROOTS` (see Configuration below).
 
-#### Configure in Cursor
-
-1. Open Cursor Settings -> **Features** -> **MCP**.
+#### 2. Cursor
+1. Go to **Settings** -> **Features** -> **MCP**.
 2. Click **+ Add New MCP Server**.
-3. Fill in the fields:
+3. Set the following details:
    - **Name**: `md-safeedit`
    - **Type**: `stdio`
    - **Command**: `npx -y @md-safeedit/mcp@dev`
-4. *(Optional)* Set environment variables (such as `MDSE_ALLOWED_ROOTS` or `MDSE_TOKEN_TTL_MS`) in the configuration if desired. By default, it will allow operations in Cursor's current working directory.
+4. *(Optional)* Add the `MDSE_ALLOWED_ROOTS` environment variable in Cursor's settings. By default, it will allow operations in Cursor's current working directory.
 
 ---
 
-### Option B: Using the CLI Tool
+### B. Use via Command Line (CLI)
+You can install the command-line utility globally to manually inspect files and run operations:
 
-If you want to use the CLI tool to inspect documents, search nodes, or apply patches manually:
+```bash
+# Install CLI globally
+npm install -g @md-safeedit/cli@dev
 
-1. **Install the CLI globally**:
-   ```bash
-   npm install -g @md-safeedit/cli@dev
-   ```
+# Inspect file outline, line endings, size, and current revision hash
+mdse inspect document.md
 
-2. **Run CLI commands**:
-   ```bash
-   # Inspect a file (gets formatting, line endings, size, and current revision)
-   mdse inspect path/to/document.md
+# Search for sections, list items, or tables containing a query
+mdse search document.md --query "Installation"
 
-   # Search for section headings, list items, or table rows
-   mdse search path/to/document.md --query "Installation"
-
-   # Read a node with an anchor token
-   mdse read path/to/document.md --node-id "section:Installation"
-   ```
+# Read a specific node and obtain an opaque anchor token
+mdse read document.md --node-id "section:Getting Started"
+```
 
 > [!NOTE]
-> During the developer preview phase, the packages are published to NPM with the `@dev` tag. When installing or running via NPM/npx, make sure to append `@dev` (e.g., `@md-safeedit/mcp@dev` or `@md-safeedit/cli@dev`).
+> During the developer preview phase, the packages are published to NPM with the `@dev` tag. When installing or running via NPM/npx, make sure to append `@dev`.
 
 ---
 
-### Configuration (Environment Variables)
+## 💡 How It Works & Example
 
-The MCP server and CLI can be configured using the following environment variables:
+Traditional editing tools (e.g., regex replacement, unified diffs, full-file rewrites) often suffer from **ambiguity** (duplicate text in a file) or **stale writes** (writing to a file that has changed since the agent last read it). 
 
-- **`MDSE_ALLOWED_ROOTS`**: A comma-separated list of absolute paths that MD SafeEdit is authorized to access.
-  - *Default*: The current working directory (`process.cwd()`).
-  - *Purpose*: Prevents directory traversal attacks. MD SafeEdit will resolve all symlinks and reject operations on any files outside these roots.
-- **`MDSE_TOKEN_TTL_MS`**: The lifetime of signed anchor tokens in milliseconds.
-  - *Default*: `3600000` (1 hour).
-  - *Purpose*: Anchor tokens automatically expire after this period to prevent stale token re-use. Increase this for exceptionally long agent planning workflows.
+MD SafeEdit uses a **Compare-and-Swap (CAS) signature-guarded protocol**:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Agent as AI Agent / IDE
+    participant Server as MD SafeEdit Server
+    participant File as Markdown File
+    
+    Agent->>Server: Read Node (e.g. List Item)
+    Server->>File: Parse structure and read bytes
+    Server-->>Agent: Returns Content + Opaque Signed Anchor Token
+    Note over Agent: Agent edits content...
+    Agent->>Server: Guarded Patch (New Content + Anchor Token)
+    Server->>Server: Validate token signature & expiry
+    Server->>File: Read current file state
+    Server->>Server: Relocate target node & verify raw-byte identity
+    alt Target is unchanged
+        Server->>File: Write modification atomically
+        Server-->>Agent: Success
+    else Target changed or missing
+        Server-->>Agent: Conflict Error (No write performed)
+    end
+```
+
+### Protocol Example
+
+1. **Agent reads a node** (e.g., a table row):
+   ```json
+   {
+     "content": "| Charging current | 1A |",
+     "anchor": {
+       "token": "mdse_a1_..."
+     }
+   }
+   ```
+2. **Agent requests a guarded patch**:
+   ```json
+   {
+     "operations": [
+       {
+         "op": "replace",
+         "anchor_token": "mdse_a1_...",
+         "content": "| Charging current | 2A |"
+       }
+     ]
+   }
+   ```
+3. **MD SafeEdit applies the patch**:
+   - Verify that the target node is unmodified (raw-byte identity).
+   - Relocate the node if surrounding lines changed but the target itself is unchanged.
+   - Refuse the write with a descriptive error code (e.g. `TARGET_CHANGED`) if anyone else changed the target.
 
 ---
 
-## 2. For Contributors & Developers (Source Code)
+## ⚖️ Benchmark Results
 
-If you want to contribute, build from source, run tests, or run the benchmark comparison:
+We programmatically evaluated the core protocol against 4 common baseline strategies across **200 distinct test tasks**:
+
+| Editing Strategy | Safe Edit Success Rate (SESR) | False Accept Rate (FAR) | Key Limitations |
+| :--- | :---: | :---: | :--- |
+| **B1 (Full-File Rewrite)** | 35.7% | **100.0%** | Overwrites concurrent human or agent edits silently. |
+| **B2 (Exact String Replace)** | 60.0% | 0.0% | Fails completely on duplicate strings (ambiguity). |
+| **B3 (Unified Diff)** | 52.6% | **33.3%** | Prone to fuzzy-matching corruption in similar sections. |
+| **B4 (Line-Hash Patch)** | 71.4% | 0.0% | Fails on shifted offsets if lines before/after are added. |
+| **B5 (MD SafeEdit)** | **100.0%** | **0.0%** | **Guarantees zero silent overwrites and 100% correct edits.** |
+
+See the complete [Benchmark Report](packages/benchmark/REPORT.md) for details.
+
+---
+
+## ⚙️ Configuration (Environment Variables)
+
+Customize the behavior of the MCP server or CLI using the following environment variables:
+
+| Variable | Default | Description |
+| :--- | :--- | :--- |
+| `MDSE_ALLOWED_ROOTS` | `process.cwd()` | Comma-separated list of absolute paths. Prevents directory traversal attacks; the server will reject reads or writes outside these directories. |
+| `MDSE_TOKEN_TTL_MS` | `3600000` (1 hour) | Lifetime of signed anchor tokens in milliseconds. Prevents agents from using stale tokens from hours or days ago. |
+
+---
+
+## 🛠️ Contributor & Developer Guide
+
+If you want to modify the source code, build locally, run tests, or execute the benchmarks:
 
 ### Prerequisites
-
 - Node.js LTS
 - npm
 
-### Installation & Build
-
-Clone the repository and build the monorepo packages:
-
+### 1. Clone & Build
 ```bash
 git clone https://github.com/Igloo302/md-safeedit.git
 cd md-safeedit
@@ -197,55 +172,51 @@ npm install
 npm run build --workspaces
 ```
 
-### Running Tests
-
-Execute the unit and integration tests:
-
+### 2. Run Tests
 ```bash
 npm run test
 ```
 
-### Running the Benchmark
-
-MD SafeEdit includes a benchmarking suite that evaluates performance against 4 baseline strategies over 200 task cases:
-
+### 3. Run the Benchmark Suite
 ```bash
-# Generate benchmark task files
+# Generate the 200 tasks
 node packages/benchmark/dist/generate-tasks.js
 
-# Execute benchmark runner
+# Execute the runner and output comparison
 node packages/benchmark/dist/run.js
 ```
 
+---
 
-## Repository Layout
+## 📦 Monorepo Packages
 
-```text
-md-safeedit/
-├── packages/
-│   ├── core/                 # Guarded patch engine (revisioning, CAS, planning, atomicCAS writer)
-│   ├── markdown/             # Markdown structural adapter (parser, logical sections, relocation)
-│   ├── protocol/             # Shared schemas and HMAC-signed anchor token code
-│   ├── cli/                  # Command Line Interface (JSON-RPC adapter)
-│   ├── mcp/                  # Stdio Model Context Protocol Server
-│   └── benchmark/            # Benchmark runners, 5 baselines, task generator, and reports
-├── docs/                     # Design, protocol, architecture, and roadmap documents
-├── AGENTS.md                 # Safety rules and scope invariants for developers
-└── README.md
-```
+MD SafeEdit enforces strict package boundaries:
 
-## Non-goals
+* [`packages/core`](packages/core): Guarded patch engine (revisions, CAS planning, atomic CAS writer, overlap detection). **No Markdown dependency.**
+* [`packages/markdown`](packages/markdown): Markdown structural adapter (parsing, outline, relocation, dialect validation).
+* [`packages/protocol`](packages/protocol): Public request/response schemas and HMAC-signed anchor tokens.
+* [`packages/cli`](packages/cli): Command Line Interface (JSON-RPC adapter).
+* [`packages/mcp`](packages/mcp): Model Context Protocol (MCP) server for stdio.
+* [`packages/benchmark`](packages/benchmark): Benchmarking suite and baseline implementations.
 
-MD SafeEdit is not:
+---
 
-- a visual Markdown editor;
-- a replacement for Git;
-- a guarantee that an agent understands the user's intent;
-- a proprietary Markdown format;
-- a general-purpose collaborative editor;
-- a reason to avoid simpler edit tools when they are sufficient.
+## 🛡️ Safety Invariants & Scope
 
-## License
+### Safety Invariants
+- A write operation must not accept a bare node ID; it **must** carry an opaque anchor token.
+- Normalized hashes are used for ranking, but only **raw-byte identity** authorizes automatic relocation.
+- Any intersecting mutation ranges in one transaction reject the entire transaction.
+- Validation and disk-state verification happen again immediately before commit.
+- Untouched byte ranges remain byte-for-byte identical (no line ending normalization).
 
-Apache License 2.0 is recommended so that commercial and open-source agent products can adopt the implementation or protocol with minimal friction.
+### Supported Structures (Phase 1)
+- Document, ATX and Setext headings, logical sections.
+- Paragraphs, list items, fenced code blocks, GFM tables and table rows.
+- YAML frontmatter as a raw top-level block.
 
+---
+
+## 📄 License
+
+Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for details.
