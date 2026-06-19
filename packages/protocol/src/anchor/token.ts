@@ -34,12 +34,41 @@ export interface AnchorPayloadV1 {
   expiresAt?: number;
 }
 
+let sessionSecret: Buffer | null = null;
+
+export function getSessionSecret(): Buffer {
+  if (!sessionSecret) {
+    sessionSecret = getOrCreateSecret();
+  }
+  return sessionSecret;
+}
+
+// For testing purposes
+export function resetSessionSecretForTesting(): void {
+  sessionSecret = null;
+}
+
 function getOrCreateSecret(): Buffer {
+  if (process.env.MDSE_SECRET) {
+    const envVal = process.env.MDSE_SECRET.trim();
+    if (envVal.length === 64 && /^[0-9a-fA-F]+$/.test(envVal)) {
+      return Buffer.from(envVal, 'hex');
+    }
+    return crypto.createHash('sha256').update(envVal).digest();
+  }
+
   const secretPath = path.join(os.homedir(), '.md-safeedit-secret.key');
   try {
     if (fs.existsSync(secretPath)) {
+      if (process.platform !== 'win32') {
+        const stats = fs.statSync(secretPath);
+        const mode = stats.mode & 0o777;
+        if ((mode & 0o077) !== 0) {
+          fs.chmodSync(secretPath, 0o600);
+        }
+      }
       const secretHex = fs.readFileSync(secretPath, 'utf8').trim();
-      if (secretHex.length === 64) {
+      if (secretHex.length === 64 && /^[0-9a-fA-F]+$/.test(secretHex)) {
         return Buffer.from(secretHex, 'hex');
       }
     }
@@ -53,8 +82,6 @@ function getOrCreateSecret(): Buffer {
   return newSecret;
 }
 
-const sessionSecret = getOrCreateSecret();
-
 /**
  * Creates a signed, tamper-proof, opaque anchor token.
  */
@@ -62,7 +89,7 @@ export function createToken(payload: AnchorPayloadV1): string {
   const payloadStr = JSON.stringify(payload);
   const base64Payload = Buffer.from(payloadStr).toString('base64url');
   
-  const hmac = crypto.createHmac('sha256', sessionSecret);
+  const hmac = crypto.createHmac('sha256', getSessionSecret());
   hmac.update(base64Payload);
   const signature = hmac.digest('base64url');
   
@@ -85,7 +112,7 @@ export function verifyToken(token: string): AnchorPayloadV1 {
 
   const [base64Payload, signature] = parts;
 
-  const hmac = crypto.createHmac('sha256', sessionSecret);
+  const hmac = crypto.createHmac('sha256', getSessionSecret());
   hmac.update(base64Payload);
   const expectedSignature = hmac.digest('base64url');
 
@@ -109,6 +136,20 @@ export function verifyToken(token: string): AnchorPayloadV1 {
     const payload = JSON.parse(payloadStr) as AnchorPayloadV1;
 
     if (payload.version !== 1) {
+      throw new Error('ANCHOR_INVALID');
+    }
+
+    if (
+      typeof payload.fileKey !== 'string' ||
+      typeof payload.sourceRevision !== 'string' ||
+      !payload.range ||
+      typeof payload.range.start !== 'number' ||
+      typeof payload.range.end !== 'number' ||
+      typeof payload.rawHash !== 'string' ||
+      typeof payload.nodeType !== 'string' ||
+      !Array.isArray(payload.structuralPath) ||
+      typeof payload.issuedAt !== 'number'
+    ) {
       throw new Error('ANCHOR_INVALID');
     }
 

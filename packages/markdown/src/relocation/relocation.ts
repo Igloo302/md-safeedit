@@ -9,6 +9,19 @@ export function getPathFingerprint(path: { heading: string; level: number; occur
   return JSON.stringify(path.map(s => [s.heading, s.level, s.occurrence]));
 }
 
+function matchPathIgnoringOccurrence(
+  pathA: { heading: string; level: number; occurrence: number }[],
+  pathB: { heading: string; level: number; occurrence: number }[]
+): boolean {
+  if (pathA.length !== pathB.length) return false;
+  for (let i = 0; i < pathA.length; i++) {
+    if (pathA[i].heading !== pathB[i].heading || pathA[i].level !== pathB[i].level) {
+      return false;
+    }
+  }
+  return true;
+}
+
 interface ScoredCandidate {
   node: MarkdownNode;
   structuralScore: number;
@@ -33,9 +46,8 @@ function scoreCandidates(
   return candidates.map(candidate => {
     let score = 0;
 
-    // A. Path fingerprint match (+25)
-    const pathFP = getPathFingerprint(candidate.structuralPath);
-    if (pathFP === evidence.pathFingerprint) {
+    // A. Path fingerprint match (+25) - comparing headings and levels only
+    if (matchPathIgnoringOccurrence(candidate.structuralPath, token.structuralPath)) {
       score += 25;
     }
 
@@ -43,7 +55,6 @@ function scoreCandidates(
     let candidateParentFP: string | undefined;
     let prevFP: string | undefined;
     let nextFP: string | undefined;
-    let sibOccurrence = 1;
 
     if (candidate.parentRuntimeId) {
       const parentNode = currentNodes.find(n => n.runtimeId === candidate.parentRuntimeId);
@@ -64,16 +75,6 @@ function scoreCandidates(
           const nextNode = currentNodes.find(n => n.runtimeId === siblingIds[idx + 1]);
           if (nextNode) nextFP = nextNode.rawHash;
         }
-
-        // Sibling occurrence count of the same type
-        let occurrenceCount = 1;
-        for (let i = 0; i < idx; i++) {
-          const sibling = currentNodes.find(n => n.runtimeId === siblingIds[i]);
-          if (sibling && sibling.type === candidate.type) {
-            occurrenceCount++;
-          }
-        }
-        sibOccurrence = occurrenceCount;
       }
     }
 
@@ -90,11 +91,6 @@ function scoreCandidates(
     // Next sibling match (+15)
     if (nextFP && nextFP === evidence.nextFingerprint) {
       score += 15;
-    }
-
-    // Sibling occurrence match (+5)
-    if (sibOccurrence === evidence.siblingOccurrence) {
-      score += 5;
     }
 
     // D. Obsidian Block ID match (+50)
@@ -141,27 +137,25 @@ export function relocateNode(
     return null;
   }
 
-  const scoredCandidates = scoreCandidates(token, candidates, currentNodes, docLength);
-
-  // Sort candidates by structuralScore descending first, and use total score (which includes distance) only as a tie-breaker
-  scoredCandidates.sort((a, b) => {
-    if (Math.abs(b.structuralScore - a.structuralScore) >= 0.001) {
-      return b.structuralScore - a.structuralScore;
+  // 3. Handle multiple candidates (length >= 2) - default to ambiguous unless resolved by Block ID
+  if (candidates.length >= 2) {
+    if (token.blockId) {
+      const matchingBlockIdCandidates = candidates.filter(
+        c => c.blockId === token.blockId
+      );
+      if (matchingBlockIdCandidates.length === 1) {
+        return matchingBlockIdCandidates[0];
+      }
     }
-    return b.score - a.score;
-  });
+    return null;
+  }
 
-  // Confidence threshold: at least heading path or parent must match (+25 minimum)
+  // 4. Handle exactly 1 candidate
+  const scoredCandidates = scoreCandidates(token, candidates, currentNodes, docLength);
   const threshold = 25;
   const best = scoredCandidates[0];
 
   if (!best || best.structuralScore < threshold) {
-    return null;
-  }
-
-  // Reject on structural tie (two candidates sharing the same highest structural score)
-  const hasStructuralTie = scoredCandidates.slice(1).some(c => Math.abs(c.structuralScore - best.structuralScore) < 0.001);
-  if (hasStructuralTie) {
     return null;
   }
 
@@ -181,28 +175,28 @@ export function explainRelocationFailure(
     return 'ANCHOR_INSUFFICIENT_EVIDENCE';
   }
 
-  const scoredCandidates = scoreCandidates(token, candidates, currentNodes, docLength);
-  if (scoredCandidates.length === 0) {
+  if (candidates.length === 0) {
     return 'ANCHOR_INSUFFICIENT_EVIDENCE';
   }
 
-  scoredCandidates.sort((a, b) => {
-    if (Math.abs(b.structuralScore - a.structuralScore) >= 0.001) {
-      return b.structuralScore - a.structuralScore;
+  if (candidates.length >= 2) {
+    if (token.blockId) {
+      const matchingBlockIdCandidates = candidates.filter(
+        c => c.blockId === token.blockId
+      );
+      if (matchingBlockIdCandidates.length === 1) {
+        // Unique block ID would succeed in relocateNode
+      }
     }
-    return b.score - a.score;
-  });
+    return 'ANCHOR_AMBIGUOUS';
+  }
 
+  const scoredCandidates = scoreCandidates(token, candidates, currentNodes, docLength);
   const threshold = 25;
   const best = scoredCandidates[0];
 
   if (!best || best.structuralScore < threshold) {
     return 'ANCHOR_INSUFFICIENT_EVIDENCE';
-  }
-
-  const hasStructuralTie = scoredCandidates.slice(1).some(c => Math.abs(c.structuralScore - best.structuralScore) < 0.001);
-  if (hasStructuralTie) {
-    return 'ANCHOR_AMBIGUOUS';
   }
 
   return 'ANCHOR_AMBIGUOUS';

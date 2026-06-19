@@ -13,3 +13,6 @@ Thumbs.db
 # MD SafeEdit session key
 .md-safeedit-secret.key
 
+# Antigravity artifacts
+brain/
+

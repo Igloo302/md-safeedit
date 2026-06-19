@@ -7,10 +7,10 @@ This report evaluates the safety, correctness, robustness, and token efficiency 
 | Strategy | Safe Edit Success Rate (SESR) | False Accept Rate (FAR) | Wrong Target Rate (WTR) | Safe Rejection Rate (SRR) |
 |---|---|---|---|---|
 | **B1: Full-File Rewrite** | 64.3% | **100.0%** | 35.7% | 0.0% |
-| **B2: Exact String Replace** | 70.7% | **0.0%** | 0.0% | 100.0% |
-| **B3: Unified Diff** | 77.9% | **33.3%** | 10.7% | 66.7% |
-| **B4: Line-Hash Patch** | 74.3% | **0.0%** | 10.7% | 100.0% |
-| **B5: MD SafeEdit (Ours)** | 99.3% | **0.0%** | 0.0% | 100.0% |
+| **B2: Exact String Replace** | 71.4% | **0.0%** | 0.0% | 100.0% |
+| **B3: Unified Diff** | 78.6% | **33.3%** | 10.7% | 66.7% |
+| **B4: Line-Hash Patch** | 75.0% | **0.0%** | 10.7% | 100.0% |
+| **B5: MD SafeEdit (Ours)** | 100.0% | **0.0%** | 0.0% | 100.0% |
 
 > [!IMPORTANT]
 > **False Accept Rate (FAR)** represents the percentage of unsafe concurrent modification tasks where the strategy *incorrectly* allowed the write. Our goal is **0.0%** for MD SafeEdit.
@@ -21,10 +21,10 @@ This report evaluates the safety, correctness, robustness, and token efficiency 
 | Strategy | Success (Commits) | False Rejections | False Accepts (Unsafe) | Safe Rejections | Wrong Target writes |
 |---|---|---|---|---|---|
 | **B1: Full-File Rewrite** | 90 | 0 | 60 | 0 | 50 |
-| **B2: Exact String Replace** | 99 | 41 | 0 | 60 | 0 |
-| **B3: Unified Diff** | 109 | 16 | 20 | 40 | 15 |
-| **B4: Line-Hash Patch** | 104 | 21 | 0 | 60 | 15 |
-| **B5: MD SafeEdit (Ours)** | 139 | 1 | 0 | 60 | 0 |
+| **B2: Exact String Replace** | 100 | 40 | 0 | 60 | 0 |
+| **B3: Unified Diff** | 110 | 15 | 20 | 40 | 15 |
+| **B4: Line-Hash Patch** | 105 | 20 | 0 | 60 | 15 |
+| **B5: MD SafeEdit (Ours)** | 140 | 0 | 0 | 60 | 0 |
 
 ## Breakdown by Category
 
@@ -33,10 +33,10 @@ This report evaluates the safety, correctness, robustness, and token efficiency 
 | Strategy | Success | False Rejections | False Accepts | Safe Rejections | Wrong Target |
 |---|---|---|---|---|---|
 | **B1: Full-File Rewrite** | 40 | 0 | 0 | 0 | 0 |
-| **B2: Exact String Replace** | 39 | 1 | 0 | 0 | 0 |
-| **B3: Unified Diff** | 39 | 1 | 0 | 0 | 0 |
-| **B4: Line-Hash Patch** | 39 | 1 | 0 | 0 | 0 |
-| **B5: MD SafeEdit (Ours)** | 39 | 1 | 0 | 0 | 0 |
+| **B2: Exact String Replace** | 40 | 0 | 0 | 0 | 0 |
+| **B3: Unified Diff** | 40 | 0 | 0 | 0 | 0 |
+| **B4: Line-Hash Patch** | 40 | 0 | 0 | 0 | 0 |
+| **B5: MD SafeEdit (Ours)** | 40 | 0 | 0 | 0 | 0 |
 
 ### Category: `ambiguity-reject`
 

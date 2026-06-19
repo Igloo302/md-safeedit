@@ -192,8 +192,8 @@ We evaluated the core protocol against 4 common baseline strategies across **200
 | **B4 (Line-Hash Patch)** | 74.3% | **0.0%** | Fails on shifted offsets if lines before/after are added. |
 | **B5 (MD SafeEdit)** | **99.3%** | **0.0%** | **Guarantees zero silent overwrites and 100% correct edits.** |
 
-* **False Accept Rate (FAR)**: The percentage of unsafe concurrent modifications incorrectly allowed. Our goal is 0.0% to prevent silent overwrites.
-* **Safe Edit Success Rate (SESR)**: The percentage of correct, safe edits successfully relocated and committed.
+* **Safe Edit Success Rate (SESR)**: The ratio of successfully applied patches to total valid patch requests. A valid patch request is one where the target node exists and is structurally identical to the original token's state, but may have shifted in position due to concurrent modifications in other parts of the document.
+* **False Accept Rate (FAR)**: The ratio of incorrectly allowed edits (silent overwrites) to total conflict/tamper test cases. A false acceptance occurs when a patch is committed despite the target node having been deleted/modified, or when the token has been tampered with or expired. FAR must remain strictly **0.0%** to guarantee edit safety.
 
 ### 2. Token Efficiency (Real-World Scale Test)
 
@@ -270,6 +270,8 @@ MD SafeEdit enforces strict package boundaries:
 ---
 
 ## 🛡️ Safety Invariants & Scope
+
+For a detailed analysis of our safety design and threat model, see the [Security Model](docs/security-model.md). For detailed constraints and unsupported features, see [Known Limitations](docs/known-limitations.md).
 
 ### Safety Invariants
 - A write operation must not accept a bare node ID; it **must** carry an opaque anchor token.

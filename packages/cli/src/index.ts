@@ -52,7 +52,7 @@ async function main() {
     console.error('    mdse patch <filePath> <op: replace|delete|insert_before|insert_after> <anchorToken> [content] [--commit]');
     console.error('  As stdin/JSON tool (when no additional arguments are supplied):');
     console.error('    echo <JSON_PAYLOAD> | mdse <command>');
-    process.exit(1);
+    process.exit(64);
   }
 
   let jsonPayload: any;
@@ -66,7 +66,7 @@ async function main() {
     } else if (command === 'search') {
       if (args.length < 3) {
         console.error('Error: "search" requires a query string argument.');
-        process.exit(1);
+        process.exit(64);
       }
       jsonPayload = {
         file: { path: args[1] },
@@ -75,7 +75,7 @@ async function main() {
     } else if (command === 'read') {
       if (args.length < 3) {
         console.error('Error: "read" requires at least one runtime ID.');
-        process.exit(1);
+        process.exit(64);
       }
       const runtimeIds = args.slice(2);
       jsonPayload = {
@@ -85,7 +85,7 @@ async function main() {
     } else if (command === 'patch') {
       if (args.length < 4) {
         console.error('Error: "patch" requires operation (replace|delete|insert_before|insert_after) and anchor token.');
-        process.exit(1);
+        process.exit(64);
       }
       const op = args[2];
       const anchorToken = args[3];
@@ -98,7 +98,7 @@ async function main() {
           content = potentialContent;
         } else {
           console.error(`Error: "patch" operation "${op}" requires a content string.`);
-          process.exit(1);
+          process.exit(64);
         }
       }
 
@@ -117,7 +117,7 @@ async function main() {
       };
     } else {
       console.log(JSON.stringify(formatError('IO_ERROR', `Unknown command: ${command}`)));
-      process.exit(1);
+      process.exit(64);
     }
   } else {
     // Read from stdin JSON
@@ -126,19 +126,19 @@ async function main() {
       inputData = await readStdin();
     } catch (err: any) {
       console.log(JSON.stringify(formatError('IO_ERROR', `Failed to read stdin: ${err.message}`)));
-      process.exit(1);
+      process.exit(64);
     }
 
     if (!inputData.trim()) {
       console.log(JSON.stringify(formatError('IO_ERROR', 'Empty request payload from stdin.')));
-      process.exit(1);
+      process.exit(64);
     }
 
     try {
       jsonPayload = JSON.parse(inputData);
     } catch (err: any) {
       console.log(JSON.stringify(formatError('IO_ERROR', `Invalid JSON payload: ${err.message}`)));
-      process.exit(1);
+      process.exit(64);
     }
   }
 
@@ -200,14 +200,16 @@ function getExitCode(result: any): number {
       return 3;
     case 'ANCHOR_INVALID':
     case 'ANCHOR_AMBIGUOUS':
-    case 'OVERLAPPING_OPERATIONS':
+    case 'ANCHOR_INSUFFICIENT_EVIDENCE':
       return 4;
     case 'VALIDATION_FAILED':
     case 'INVALID_REPLACEMENT':
     case 'UNSUPPORTED_SYNTAX':
+    case 'OVERLAPPING_OPERATIONS':
       return 5;
     case 'IO_ERROR':
     case 'COMMIT_RACE':
+      return 6;
     default:
       return 6;
   }
