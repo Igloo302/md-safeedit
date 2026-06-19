@@ -180,14 +180,40 @@ async function main() {
   // Print JSON result to stdout
   console.log(JSON.stringify(result, null, 2));
 
-  if (result && result.ok === false) {
-    process.exit(1);
-  } else {
-    process.exit(0);
+  const exitCode = getExitCode(result);
+  process.exit(exitCode);
+}
+
+function getExitCode(result: any): number {
+  if (!result) return 6;
+  if (result.ok !== false) return 0;
+  
+  const errorCode = result.error?.code;
+  if (!errorCode) return 1;
+  
+  switch (errorCode) {
+    case 'DOCUMENT_CHANGED':
+    case 'TARGET_CHANGED':
+    case 'TARGET_MISSING':
+      return 2;
+    case 'ANCHOR_EXPIRED':
+      return 3;
+    case 'ANCHOR_INVALID':
+    case 'ANCHOR_AMBIGUOUS':
+    case 'OVERLAPPING_OPERATIONS':
+      return 4;
+    case 'VALIDATION_FAILED':
+    case 'INVALID_REPLACEMENT':
+    case 'UNSUPPORTED_SYNTAX':
+      return 5;
+    case 'IO_ERROR':
+    case 'COMMIT_RACE':
+    default:
+      return 6;
   }
 }
 
 main().catch(err => {
   console.error(err);
-  process.exit(1);
+  process.exit(6);
 });

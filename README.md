@@ -2,19 +2,94 @@
 
 > **Safe, precise, structure-aware Markdown editing for AI coding agents.**
 
-MD SafeEdit provides a reference implementation of a **Markdown-aware guarded patch protocol** for AI agents. It protects files from silent overwrites, handles content relocation when surrounding lines move, and ensures byte-for-byte fidelity of untouched parts.
+MD SafeEdit is a Markdown editing tool **distributed via Agent Skills** and **executed by a CLI safety engine**, with an optional **MCP adapter** for structured environments, and a **Node.js Library** for integration. It protects files from silent overwrites, handles content relocation when surrounding lines move, and ensures byte-for-byte fidelity of untouched parts.
 
 ---
 
-## 🚀 Quick Start (MCP & CLI)
+## 📦 Distribution Hierarchy & Architecture
 
-You do **not** need to clone this repository to use MD SafeEdit. You can install or run it directly via NPM.
+MD SafeEdit is structured to support different workflows depending on your agent integration environment:
 
-### A. Run as an MCP Server (Cursor & Claude Desktop)
-MD SafeEdit implements the Model Context Protocol (MCP), allowing AI coding assistants to automatically inspect, search, and safely update Markdown files using guarded patches.
+1. **Skill (Discovery & Workflow)**: The primary entry point. Instructs the Agent on how to find and coordinate the edit cycle without modifying raw markdown.
+2. **CLI (Local Execution)**: The default, omnipresent execution backend. Can be run on-demand via `npx` with **zero system clutter** or installed globally.
+3. **Node.js Library (Integration)**: For direct programmatic usage in developer codebases.
+4. **MCP (Structured Adapter)**: An optional interface for clients like Cursor or Claude Desktop requiring tool-level JSON Schema controls.
 
-#### 1. Claude Desktop
-Add the following to your Claude Desktop configuration file (typically `~/Library/Application Support/Claude/claude_desktop_config.json` on macOS, or `%APPDATA%\Claude\claude_desktop_config.json` on Windows):
+---
+
+## 🚀 Getting Started
+
+Choose the path that best fits your environment.
+
+### 1. Install the Agent Skill (Recommended for AI Agents)
+
+To guide your programming Agent (e.g., Codex, Claude Code, Aider, etc.) to use MD SafeEdit, place the Skill configuration folder into your workspace customizations root:
+
+* Folder Path: `.agents/skills/md-safeedit/`
+* Files: [SKILL.md](.agents/skills/md-safeedit/SKILL.md) and [references/conflict-resolution.md](.agents/skills/md-safeedit/references/conflict-resolution.md)
+
+Once loaded, the Agent will automatically discover the tool and execute CLI commands on-demand via `npx` with zero permanent installation footprint.
+
+---
+
+### 2. Use via Command Line (CLI)
+
+You can run the CLI on-demand via `npx` without cluttering your system, or install it globally:
+
+#### A. Run On-Demand via `npx` (No Global Install)
+```bash
+# Inspect file outline
+npx -y @md-safeedit/cli@dev inspect path/to/document.md
+
+# Search for nodes
+npx -y @md-safeedit/cli@dev search path/to/document.md "query"
+
+# Read target node
+npx -y @md-safeedit/cli@dev read path/to/document.md "node_id_here"
+
+# Patch target node (preview dry-run)
+npx -y @md-safeedit/cli@dev patch path/to/document.md replace "anchor_token" "New content"
+
+# Commit patch to disk
+npx -y @md-safeedit/cli@dev patch path/to/document.md replace "anchor_token" "New content" --commit
+```
+
+#### B. Install Globally
+```bash
+npm install -g @md-safeedit/cli@dev
+
+# Use the 'mdse' binary directly
+mdse inspect path/to/document.md
+```
+
+> [!NOTE]
+> During the developer preview phase, all packages are published with the `@dev` tag. Ensure you append `@dev` when installing or calling via `npx`.
+
+---
+
+### 3. Use as a Node.js / TypeScript Library
+
+If you are building your own Agent or document processing pipeline, import the libraries directly:
+
+```bash
+npm install @md-safeedit/core@dev @md-safeedit/markdown@dev
+```
+
+```typescript
+import { createSnapshot } from '@md-safeedit/core';
+import { parseMarkdownToNodes, buildLogicalSections } from '@md-safeedit/markdown';
+
+// Perform AST parsing, snapshotting, and transaction planning programmatically.
+```
+
+---
+
+### 4. Run as an MCP Server (Optional Adapter)
+
+For environments like Claude Desktop or Cursor that lack a shell but support Model Context Protocol (MCP):
+
+#### Claude Desktop Configuration
+Add this to your configuration file (typically `claude_desktop_config.json`):
 
 ```json
 {
@@ -33,40 +108,14 @@ Add the following to your Claude Desktop configuration file (typically `~/Librar
 }
 ```
 
-> [!IMPORTANT]
-> - Replace `/absolute/path/to/your/workspace` with your actual workspace root directory.
-> - For security, the MCP server restricts files it can read or write to directories specified in `MDSE_ALLOWED_ROOTS` (see Configuration below).
-
-#### 2. Cursor
+#### Cursor Configuration
 1. Go to **Settings** -> **Features** -> **MCP**.
 2. Click **+ Add New MCP Server**.
-3. Set the following details:
+3. Set the details:
    - **Name**: `md-safeedit`
    - **Type**: `stdio`
    - **Command**: `npx -y @md-safeedit/mcp@dev`
 4. *(Optional)* Add the `MDSE_ALLOWED_ROOTS` environment variable in Cursor's settings. By default, it will allow operations in Cursor's current working directory.
-
----
-
-### B. Use via Command Line (CLI)
-You can install the command-line utility globally to manually inspect files and run operations:
-
-```bash
-# Install CLI globally
-npm install -g @md-safeedit/cli@dev
-
-# Inspect file outline, line endings, size, and current revision hash
-mdse inspect document.md
-
-# Search for sections, list items, or tables containing a query
-mdse search document.md --query "Installation"
-
-# Read a specific node and obtain an opaque anchor token
-mdse read document.md --node-id "section:Getting Started"
-```
-
-> [!NOTE]
-> During the developer preview phase, the packages are published to NPM with the `@dev` tag. When installing or running via NPM/npx, make sure to append `@dev`.
 
 ---
 
