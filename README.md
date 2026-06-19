@@ -87,6 +87,100 @@ See the full [Benchmark Report](packages/benchmark/REPORT.md).
 
 ## Getting Started
 
+MD SafeEdit can be used in two ways:
+1. **As an End User** (e.g., running the MCP Server for Cursor/Claude Desktop, or using the CLI) — **No source code clone required!** You can run or install it directly via NPM.
+2. **As a Contributor / Developer** (building from source, running tests, or running the benchmark) — Clone this GitHub repository and build locally.
+
+---
+
+## 1. For End Users (MCP & CLI)
+
+You do **not** need to clone this repository. Ensure you have Node.js (LTS version recommended) and npm installed.
+
+### Option A: Using the MCP Server in AI Coding Assistants
+
+MD SafeEdit can run as a Model Context Protocol (MCP) server, allowing AI coding assistants like **Cursor**, **Claude Desktop**, or **Windsurf** to safely read and edit Markdown files using the signature-guarded CAS patch protocol.
+
+#### Configure in Claude Desktop
+
+Add the following configuration to your Claude Desktop configuration file (typically `~/Library/Application Support/Claude/claude_desktop_config.json` on macOS, or `%APPDATA%\Claude\claude_desktop_config.json` on Windows):
+
+```json
+{
+  "mcpServers": {
+    "md-safeedit": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@md-safeedit/mcp@dev"
+      ],
+      "env": {
+        "MDSE_ALLOWED_ROOTS": "/absolute/path/to/your/project"
+      }
+    }
+  }
+}
+```
+
+> [!IMPORTANT]
+> - Replace `/absolute/path/to/your/project` with your actual workspace root directory.
+> - For security, the MCP server restricts files it can read or write to directories specified in `MDSE_ALLOWED_ROOTS` (see Configuration below).
+
+#### Configure in Cursor
+
+1. Open Cursor Settings -> **Features** -> **MCP**.
+2. Click **+ Add New MCP Server**.
+3. Fill in the fields:
+   - **Name**: `md-safeedit`
+   - **Type**: `stdio`
+   - **Command**: `npx -y @md-safeedit/mcp@dev`
+4. *(Optional)* Set environment variables (such as `MDSE_ALLOWED_ROOTS` or `MDSE_TOKEN_TTL_MS`) in the configuration if desired. By default, it will allow operations in Cursor's current working directory.
+
+---
+
+### Option B: Using the CLI Tool
+
+If you want to use the CLI tool to inspect documents, search nodes, or apply patches manually:
+
+1. **Install the CLI globally**:
+   ```bash
+   npm install -g @md-safeedit/cli@dev
+   ```
+
+2. **Run CLI commands**:
+   ```bash
+   # Inspect a file (gets formatting, line endings, size, and current revision)
+   mdse inspect path/to/document.md
+
+   # Search for section headings, list items, or table rows
+   mdse search path/to/document.md --query "Installation"
+
+   # Read a node with an anchor token
+   mdse read path/to/document.md --node-id "section:Installation"
+   ```
+
+> [!NOTE]
+> During the developer preview phase, the packages are published to NPM with the `@dev` tag. When installing or running via NPM/npx, make sure to append `@dev` (e.g., `@md-safeedit/mcp@dev` or `@md-safeedit/cli@dev`).
+
+---
+
+### Configuration (Environment Variables)
+
+The MCP server and CLI can be configured using the following environment variables:
+
+- **`MDSE_ALLOWED_ROOTS`**: A comma-separated list of absolute paths that MD SafeEdit is authorized to access.
+  - *Default*: The current working directory (`process.cwd()`).
+  - *Purpose*: Prevents directory traversal attacks. MD SafeEdit will resolve all symlinks and reject operations on any files outside these roots.
+- **`MDSE_TOKEN_TTL_MS`**: The lifetime of signed anchor tokens in milliseconds.
+  - *Default*: `3600000` (1 hour).
+  - *Purpose*: Anchor tokens automatically expire after this period to prevent stale token re-use. Increase this for exceptionally long agent planning workflows.
+
+---
+
+## 2. For Contributors & Developers (Source Code)
+
+If you want to contribute, build from source, run tests, or run the benchmark comparison:
+
 ### Prerequisites
 
 - Node.js LTS
@@ -94,9 +188,11 @@ See the full [Benchmark Report](packages/benchmark/REPORT.md).
 
 ### Installation & Build
 
-Clone the repository and install dependencies:
+Clone the repository and build the monorepo packages:
 
 ```bash
+git clone https://github.com/Igloo302/md-safeedit.git
+cd md-safeedit
 npm install
 npm run build --workspaces
 ```
@@ -111,18 +207,16 @@ npm run test
 
 ### Running the Benchmark
 
-Generate the 200 task cases and run the benchmark comparison:
+MD SafeEdit includes a benchmarking suite that evaluates performance against 4 baseline strategies over 200 task cases:
 
 ```bash
-# Compile packages
-npm run build --workspaces
-
 # Generate benchmark task files
 node packages/benchmark/dist/generate-tasks.js
 
 # Execute benchmark runner
 node packages/benchmark/dist/run.js
 ```
+
 
 ## Repository Layout
 
