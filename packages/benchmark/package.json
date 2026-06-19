@@ -1,0 +1,18 @@
+{
+  "name": "@md-safeedit/benchmark",
+  "version": "0.1.0-dev",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "generate": "node dist/generate-tasks.js",
+    "run": "node dist/run.js"
+  },
+  "dependencies": {
+    "@md-safeedit/core": "*",
+    "@md-safeedit/markdown": "*",
+    "@md-safeedit/protocol": "*",
+    "@md-safeedit/cli": "*"
+  }
+}

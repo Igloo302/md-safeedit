@@ -1,0 +1,19 @@
+# Node.js dependencies
+node_modules/
+npm-debug.log*
+
+# Compiled outputs (individual packages will compile and publish, but we ignore built JS locally in git)
+**/dist/
+**/*.tsbuildinfo
+
+# Operating system files
+.DS_Store
+Thumbs.db
+
+# MD SafeEdit session key
+.md-safeedit-secret.key
+
+# Excluded directories and files from GitHub publishing (per your request)
+docs/
+项目总览.md
+AGENTS.md

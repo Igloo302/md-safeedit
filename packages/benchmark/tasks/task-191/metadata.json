@@ -1,0 +1,4 @@
+{
+  "category": "transaction-batch",
+  "expected_outcome": "commit"
+}

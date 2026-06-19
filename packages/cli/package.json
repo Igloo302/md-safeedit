@@ -1,0 +1,28 @@
+{
+  "name": "@md-safeedit/cli",
+  "version": "0.1.0-dev",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./services.js": "./dist/services.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@md-safeedit/core": "*",
+    "@md-safeedit/markdown": "*",
+    "@md-safeedit/protocol": "*"
+  },
+  "bin": {
+    "mdse": "./dist/index.js"
+  }
+}
