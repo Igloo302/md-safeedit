@@ -16,21 +16,6 @@ This report evaluates the safety, correctness, robustness, and token efficiency 
 > **False Accept Rate (FAR)** represents the percentage of unsafe concurrent modification tasks where the strategy *incorrectly* allowed the write. Our goal is **0.0%** for MD SafeEdit.
 > **Safe Edit Success Rate (SESR)** measures the percentage of correct, safe edits successfully relocated and committed.
 
-## Token Efficiency Metrics
-
-Evaluating the average estimated tokens (based on characters / 4) consumed per edit operation (input + output) across all tasks:
-
-| Strategy | Avg Input Tokens | Avg Output Tokens | Avg Total Tokens | Token Savings vs B1 |
-|---|---|---|---|---|
-| **B1: Full-File Rewrite** | 12.9 | 12.9 | 25.8 | - |
-| **B2: Exact String Replace** | 12.9 | 11.0 | 23.9 | **7.2%** |
-| **B3: Unified Diff** | 12.9 | 48.5 | 61.4 | **-138.2%** |
-| **B4: Line-Hash Patch** | 12.9 | 31.9 | 44.7 | **-73.7%** |
-| **B5: MD SafeEdit (Ours)** | 71.8 | 26.9 | 98.7 | **-283.1%** |
-
-> [!TIP]
-> **Scale & Efficiency Note**: The benchmark task files are programmatically generated tiny fixtures (averaging ~50 characters) designed for rapid safety/correctness checks. For such micro-files, the fixed metadata overhead of the structural outline makes B5 consume more tokens than a simple full-file rewrite. However, in real-world large documents (e.g., >10KB documentation files), B1/B2/B3/B4 scale linearly with file size (consuming thousands of tokens), whereas MD SafeEdit's token consumption remains flat (only the outline headings + target node), resulting in **80% to 95%+ token savings**.
-
 ## Detailed Task Outcomes
 
 | Strategy | Success (Commits) | False Rejections | False Accepts (Unsafe) | Safe Rejections | Wrong Target writes |
