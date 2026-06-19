@@ -5,7 +5,7 @@ import {
   searchService, 
   readService, 
   patchService 
-} from '@igloo302/cli/services.js';
+} from '@md-safeedit/cli/services.js';
 
 const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
 

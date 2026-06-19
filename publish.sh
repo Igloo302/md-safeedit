@@ -3,7 +3,7 @@
 # Exit on any error
 set -e
 
-echo "📦 Starting publication of @igloo302 packages to NPM..."
+echo "📦 Starting publication of @md-safeedit packages to NPM..."
 
 # Order of publication based on internal dependency structure:
 # 1. core (no internal dependencies)
@@ -15,7 +15,7 @@ echo "📦 Starting publication of @igloo302 packages to NPM..."
 for pkg in core protocol markdown cli mcp; do
   echo ""
   echo "------------------------------------------------"
-  echo "🚀 Publishing @igloo302/$pkg..."
+  echo "🚀 Publishing @md-safeedit/$pkg..."
   echo "------------------------------------------------"
   cd packages/$pkg
   npm publish --tag dev --access public

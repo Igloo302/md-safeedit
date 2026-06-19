@@ -1,5 +1,5 @@
 {
-  "name": "@igloo302/benchmark",
+  "name": "@md-safeedit/benchmark",
   "version": "0.1.0-dev",
   "type": "module",
   "main": "./dist/index.js",
@@ -10,9 +10,9 @@
     "run": "node dist/run.js"
   },
   "dependencies": {
-    "@igloo302/core": "*",
-    "@igloo302/markdown": "*",
-    "@igloo302/protocol": "*",
-    "@igloo302/cli": "*"
+    "@md-safeedit/core": "*",
+    "@md-safeedit/markdown": "*",
+    "@md-safeedit/protocol": "*",
+    "@md-safeedit/cli": "*"
   }
 }

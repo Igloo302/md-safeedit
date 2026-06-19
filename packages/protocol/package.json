@@ -1,5 +1,5 @@
 {
-  "name": "@igloo302/protocol",
+  "name": "@md-safeedit/protocol",
   "version": "0.1.0-dev",
   "type": "module",
   "main": "./dist/index.js",
@@ -17,7 +17,7 @@
     "build": "tsc"
   },
   "dependencies": {
-    "@igloo302/core": "*",
+    "@md-safeedit/core": "*",
     "zod": "^3.22.4"
   }
 }

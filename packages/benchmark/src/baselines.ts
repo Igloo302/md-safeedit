@@ -1,8 +1,8 @@
 import * as fs from 'fs';
 import * as crypto from 'crypto';
-import { generateUnifiedDiff } from '@igloo302/core';
-import { readService, patchService } from '@igloo302/cli/services.js';
-import { parseMarkdownToNodes, buildLogicalSections } from '@igloo302/markdown';
+import { generateUnifiedDiff } from '@md-safeedit/core';
+import { readService, patchService } from '@md-safeedit/cli/services.js';
+import { parseMarkdownToNodes, buildLogicalSections } from '@md-safeedit/markdown';
 
 export interface BaselineResult {
   ok: boolean;

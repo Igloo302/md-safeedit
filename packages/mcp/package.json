@@ -1,5 +1,5 @@
 {
-  "name": "@igloo302/mcp",
+  "name": "@md-safeedit/mcp",
   "version": "0.1.0-dev",
   "type": "module",
   "main": "./dist/index.js",
@@ -22,9 +22,9 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.1",
-    "@igloo302/core": "*",
-    "@igloo302/markdown": "*",
-    "@igloo302/protocol": "*",
-    "@igloo302/cli": "*"
+    "@md-safeedit/core": "*",
+    "@md-safeedit/markdown": "*",
+    "@md-safeedit/protocol": "*",
+    "@md-safeedit/cli": "*"
   }
 }

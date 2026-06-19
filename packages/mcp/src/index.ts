@@ -12,13 +12,13 @@ import {
   readService, 
   patchService,
   formatError
-} from '@igloo302/cli/services.js';
+} from '@md-safeedit/cli/services.js';
 import { 
   InspectRequestSchema,
   SearchRequestSchema,
   ReadRequestSchema,
   PatchRequestSchema
-} from '@igloo302/protocol';
+} from '@md-safeedit/protocol';
 
 // Allowed roots configuration
 const envRoots = process.env.MDSE_ALLOWED_ROOTS;

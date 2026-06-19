@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { InspectRequestSchema, SearchRequestSchema, ReadRequestSchema, PatchRequestSchema } from '@igloo302/protocol';
+import { InspectRequestSchema, SearchRequestSchema, ReadRequestSchema, PatchRequestSchema } from '@md-safeedit/protocol';
 import { inspectService, searchService, readService, patchService, formatError } from './services.js';
 // Read allowed roots from environment variable or default to process.cwd()
 const envRoots = process.env.MDSE_ALLOWED_ROOTS;

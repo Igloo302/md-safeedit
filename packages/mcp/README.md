@@ -1,4 +1,4 @@
-# @igloo302/mcp
+# @md-safeedit/mcp
 
 MD SafeEdit Model Context Protocol (MCP) Server.
 

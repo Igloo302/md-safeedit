@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { parseMarkdownToNodes, buildLogicalSections } from '@igloo302/markdown';
+import { parseMarkdownToNodes, buildLogicalSections } from '@md-safeedit/markdown';
 import { runFullFileRewrite, runExactStringReplace, runUnifiedDiff, runLineHashPatch, runMDSafeEdit } from './baselines.js';
 const TASKS_DIR = path.join(process.cwd(), 'packages/benchmark/tasks');
 const TEMP_DIR = path.join(process.cwd(), 'packages/benchmark/temp');

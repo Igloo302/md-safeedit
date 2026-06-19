@@ -1,5 +1,5 @@
 {
-  "name": "@igloo302/cli",
+  "name": "@md-safeedit/cli",
   "version": "0.1.0-dev",
   "type": "module",
   "main": "./dist/index.js",
@@ -18,9 +18,9 @@
     "build": "tsc"
   },
   "dependencies": {
-    "@igloo302/core": "*",
-    "@igloo302/markdown": "*",
-    "@igloo302/protocol": "*"
+    "@md-safeedit/core": "*",
+    "@md-safeedit/markdown": "*",
+    "@md-safeedit/protocol": "*"
   },
   "bin": {
     "mdse": "./dist/index.js"
