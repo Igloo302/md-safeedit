@@ -206,7 +206,9 @@ async function main() {
 
   if (command === 'init') {
     const targetDir = args[1] || process.cwd();
-    const result = initService(targetDir);
+    const result = initService(targetDir) as any;
+    result.protocol_version = '1.0';
+    result.cli_version = cliVersion;
     if (hasJsonFlag) {
       console.log(JSON.stringify(result, null, 2));
     } else {
