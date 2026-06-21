@@ -1,0 +1,7 @@
+{
+  "id": "task-011",
+  "category": "ambiguity-duplicate",
+  "prompt": "Modify the paragraph under the second \"# Section\" header to say: Content B modified",
+  "target_type": "paragraph",
+  "expected_outcome": "commit"
+}

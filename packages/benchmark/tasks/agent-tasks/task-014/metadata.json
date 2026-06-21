@@ -1,0 +1,7 @@
+{
+  "id": "task-014",
+  "category": "ambiguity-duplicate",
+  "prompt": "Modify the paragraph under Section B to say: This text is duplicate modified.",
+  "target_type": "paragraph",
+  "expected_outcome": "commit"
+}

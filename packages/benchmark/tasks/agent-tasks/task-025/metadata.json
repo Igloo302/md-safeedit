@@ -1,0 +1,11 @@
+{
+  "id": "task-025",
+  "category": "concurrent-agents",
+  "prompt": "Insert \"Inserted by Agent Y\" after Paragraph. Message \"I have read the node.\" after reading.",
+  "target_type": "paragraph",
+  "expected_outcome": "reject",
+  "simulate_user_change": {
+    "change_type": "concurrent_agent_commit",
+    "new_content": "# Title\nParagraph\n\nInserted by Agent X\n"
+  }
+}

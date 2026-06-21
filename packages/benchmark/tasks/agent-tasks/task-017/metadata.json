@@ -1,0 +1,11 @@
+{
+  "id": "task-017",
+  "category": "user-change-post-read",
+  "prompt": "Update Item B to say: Item B updated. Note: Message \"I have read the node.\" after reading B.",
+  "target_type": "list_item",
+  "expected_outcome": "reject",
+  "simulate_user_change": {
+    "change_type": "modify_target",
+    "new_content": "# List\n- Item A\n"
+  }
+}

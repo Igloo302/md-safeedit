@@ -1,0 +1,11 @@
+{
+  "id": "task-024",
+  "category": "concurrent-agents",
+  "prompt": "Modify Paragraph. Message \"I have read the node.\" after reading.",
+  "target_type": "paragraph",
+  "expected_outcome": "reject",
+  "simulate_user_change": {
+    "change_type": "concurrent_agent_commit",
+    "new_content": "# Header modified\nParagraph\n"
+  }
+}

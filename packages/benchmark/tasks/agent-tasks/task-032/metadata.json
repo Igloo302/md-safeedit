@@ -1,0 +1,7 @@
+{
+  "id": "task-032",
+  "category": "node-relocation",
+  "prompt": "Modify Paragraph 3 to say: Paragraph 3 updated",
+  "target_type": "paragraph",
+  "expected_outcome": "commit"
+}

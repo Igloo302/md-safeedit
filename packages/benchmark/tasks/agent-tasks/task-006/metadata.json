@@ -1,0 +1,7 @@
+{
+  "id": "task-006",
+  "category": "standard-edit",
+  "prompt": "Insert a list item \"Buy milk\" before \"Buy eggs\".",
+  "target_type": "list_item",
+  "expected_outcome": "commit"
+}

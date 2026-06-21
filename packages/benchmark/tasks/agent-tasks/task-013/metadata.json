@@ -1,0 +1,7 @@
+{
+  "id": "task-013",
+  "category": "ambiguity-duplicate",
+  "prompt": "Modify the second row containing \"2025 | 100\" to set Sale to 120.",
+  "target_type": "table_row",
+  "expected_outcome": "commit"
+}

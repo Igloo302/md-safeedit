@@ -1,0 +1,7 @@
+{
+  "id": "task-005",
+  "category": "standard-edit",
+  "prompt": "Delete the list item \"Buy milk\".",
+  "target_type": "list_item",
+  "expected_outcome": "commit"
+}

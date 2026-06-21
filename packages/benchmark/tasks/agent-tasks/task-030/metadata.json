@@ -1,0 +1,7 @@
+{
+  "id": "task-030",
+  "category": "node-relocation",
+  "prompt": "Modify Item B to say: Item B updated",
+  "target_type": "list_item",
+  "expected_outcome": "commit"
+}

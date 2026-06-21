@@ -1,0 +1,11 @@
+{
+  "id": "task-016",
+  "category": "user-change-post-read",
+  "prompt": "Update paragraph A to say: This is paragraph A updated. Note: You must check in with the coordinator by messaging \"I have read the node.\" after reading the node but before patching it.",
+  "target_type": "paragraph",
+  "expected_outcome": "reject",
+  "simulate_user_change": {
+    "change_type": "modify_target",
+    "new_content": "# Title\nThis is paragraph A modified concurrently by user.\n"
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "id": "task-010",
+  "category": "standard-edit",
+  "prompt": "Modify the code block to set a = 2.",
+  "target_type": "fenced_code",
+  "expected_outcome": "commit"
+}

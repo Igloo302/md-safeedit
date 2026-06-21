@@ -1,0 +1,7 @@
+{
+  "id": "task-002",
+  "category": "standard-edit",
+  "prompt": "Delete the paragraph containing: This is paragraph B.",
+  "target_type": "paragraph",
+  "expected_outcome": "commit"
+}

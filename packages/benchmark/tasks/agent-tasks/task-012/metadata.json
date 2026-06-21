@@ -1,0 +1,7 @@
+{
+  "id": "task-012",
+  "category": "ambiguity-duplicate",
+  "prompt": "Modify the second \"Duplicate item\" list item to say: Duplicate item modified (Ensure you modify the second one, not the first).",
+  "target_type": "list_item",
+  "expected_outcome": "commit"
+}

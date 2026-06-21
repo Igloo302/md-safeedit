@@ -1,0 +1,11 @@
+{
+  "id": "task-023",
+  "category": "concurrent-agents",
+  "prompt": "Modify Banana price to 2.5. Message \"I have read the node.\" after reading.",
+  "target_type": "table_row",
+  "expected_outcome": "reject",
+  "simulate_user_change": {
+    "change_type": "concurrent_agent_commit",
+    "new_content": "| Item | Price |\n|---|---|\n| Apple | 1.5 |\n| Banana | 2 |\n"
+  }
+}

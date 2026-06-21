@@ -1,0 +1,7 @@
+{
+  "id": "task-009",
+  "category": "standard-edit",
+  "prompt": "Insert a new table row for Banana with Qty 5 after Apple.",
+  "target_type": "table_row",
+  "expected_outcome": "commit"
+}

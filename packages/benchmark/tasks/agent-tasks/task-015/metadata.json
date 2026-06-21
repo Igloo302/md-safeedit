@@ -1,0 +1,7 @@
+{
+  "id": "task-015",
+  "category": "ambiguity-duplicate",
+  "prompt": "Modify the paragraph \"Content B\" under Parent B > Duplicate to say: Content B modified",
+  "target_type": "paragraph",
+  "expected_outcome": "commit"
+}

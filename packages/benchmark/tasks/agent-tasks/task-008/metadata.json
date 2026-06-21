@@ -1,0 +1,7 @@
+{
+  "id": "task-008",
+  "category": "standard-edit",
+  "prompt": "Delete the table row for Apple.",
+  "target_type": "table_row",
+  "expected_outcome": "commit"
+}

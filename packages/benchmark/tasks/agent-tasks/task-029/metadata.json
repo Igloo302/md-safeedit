@@ -1,0 +1,7 @@
+{
+  "id": "task-029",
+  "category": "node-relocation",
+  "prompt": "Modify Target paragraph to say: Target paragraph updated.",
+  "target_type": "paragraph",
+  "expected_outcome": "commit"
+}

@@ -1,0 +1,7 @@
+{
+  "id": "task-001",
+  "category": "standard-edit",
+  "prompt": "Modify paragraph B to say: This is paragraph B modified.",
+  "target_type": "paragraph",
+  "expected_outcome": "commit"
+}

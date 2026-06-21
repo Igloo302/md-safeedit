@@ -1,0 +1,8 @@
+{
+  "id": "task-027",
+  "category": "expired-anchor",
+  "prompt": "Modify Item A to say: Item A updated.",
+  "target_type": "list_item",
+  "expected_outcome": "commit_after_retry",
+  "force_expiry_ms": 10
+}

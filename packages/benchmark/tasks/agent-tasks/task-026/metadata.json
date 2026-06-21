@@ -1,0 +1,8 @@
+{
+  "id": "task-026",
+  "category": "expired-anchor",
+  "prompt": "Modify Paragraph A to say: Paragraph A updated. Note: The environment has extremely short token expiration, so expect anchor expiration and recover.",
+  "target_type": "paragraph",
+  "expected_outcome": "commit_after_retry",
+  "force_expiry_ms": 10
+}

@@ -1,0 +1,7 @@
+{
+  "id": "task-004",
+  "category": "standard-edit",
+  "prompt": "Modify the list item \"Buy eggs\" to say: Buy fresh eggs",
+  "target_type": "list_item",
+  "expected_outcome": "commit"
+}

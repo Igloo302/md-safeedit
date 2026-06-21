@@ -1,0 +1,11 @@
+{
+  "id": "task-034",
+  "category": "auto-recovery",
+  "prompt": "Update Item B to say: Item B modified. Note: Message \"I have read the node.\" after reading. If you hit TARGET_CHANGED, do not bypass or rewrite the file. Obtain a fresh token and retry.",
+  "target_type": "list_item",
+  "expected_outcome": "commit_after_retry",
+  "simulate_user_change": {
+    "change_type": "concurrent_agent_commit",
+    "new_content": "# List\n- Item A updated by User\n- Item B\n"
+  }
+}

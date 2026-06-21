@@ -1,0 +1,7 @@
+{
+  "id": "task-033",
+  "category": "node-relocation",
+  "prompt": "Modify Apple price to 1.5.",
+  "target_type": "table_row",
+  "expected_outcome": "commit"
+}

@@ -1,0 +1,7 @@
+{
+  "id": "task-007",
+  "category": "standard-edit",
+  "prompt": "Modify the table row for Apple to set Qty to 12.",
+  "target_type": "table_row",
+  "expected_outcome": "commit"
+}

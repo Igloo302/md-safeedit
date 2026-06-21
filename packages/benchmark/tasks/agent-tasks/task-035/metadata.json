@@ -1,0 +1,11 @@
+{
+  "id": "task-035",
+  "category": "auto-recovery",
+  "prompt": "Modify Paragraph B to say: Paragraph B modified. Note: Message \"I have read the node.\" after reading.",
+  "target_type": "paragraph",
+  "expected_outcome": "commit_after_retry",
+  "simulate_user_change": {
+    "change_type": "concurrent_agent_commit",
+    "new_content": "# Title\nParagraph A updated by User\n\nParagraph B\n"
+  }
+}

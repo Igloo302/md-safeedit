@@ -1,0 +1,7 @@
+{
+  "id": "task-003",
+  "category": "standard-edit",
+  "prompt": "Insert a new paragraph after paragraph A saying: This is paragraph B inserted.",
+  "target_type": "paragraph",
+  "expected_outcome": "commit"
+}
