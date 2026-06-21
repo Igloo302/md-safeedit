@@ -20,7 +20,16 @@ MD SafeEdit 是一套专为 AI Agent（如 Cursor、Claude Code、Aider 等）�
 
 MD SafeEdit 的核心定位是作为 **Agent Skill** 注入到 Agent 的工作上下文中。
 
-### 1. Skill 目录结构
+> 💡 **最省心的一键自动配置（推荐）：**
+> 您可以直接将以下这行指令复制发送给您的 AI 编程 Agent（例如 Claude Code、Cursor Agent 等），它将自动拉取我们的配置指南，并为您一键完成系统 CLI 引擎安装、工作区 Skill 写入以及 IDE 的 MCP 适配器配置：
+> 
+> ```text
+> 帮我安装并配置 MD SafeEdit：https://raw.githubusercontent.com/Igloo302/md-safeedit/main/docs/install.md
+> ```
+> 
+> *关于详细的 Agent 执行步骤、安全防线边界与健康检查细节，请参阅：[docs/install.md](docs/install.md)*
+
+### 1. 手动安装：Skill 目录结构
 
 将项目中的 `.agents/skills/md-safeedit` 文件夹复制到您项目工作区的定制化技能目录下（例如 `.agents/skills/md-safeedit/`）：
 
@@ -39,7 +48,7 @@ MD SafeEdit 的核心定位是作为 **Agent Skill** 注入到 Agent 的工作�
 
 ### 2. 自动发现与执行
 
-一旦 Skill 被载入，Agent 将会在需要修改 Markdown 文件时自动触发该 Skill 的安全工作流，并通过 `npx` 免安装按需调用 CLI 引擎，实现零环境污染、零侵入性部署。
+一旦 Skill 被手动载入或由 Agent 写入，Agent 将会在需要修改 Markdown 文件时自动触发该 Skill 的安全工作流，并通过本地 CLI 软链接或 `npx` 免安装按需调用 CLI 引擎，实现零环境污染、零侵入性部署。
 
 ---
 
