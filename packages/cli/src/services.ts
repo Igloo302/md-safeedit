@@ -404,6 +404,7 @@ export function patchService(request: PatchRequest, allowedRoots: string[]) {
 
     const byteEdits: ByteEdit[] = [];
     const operationsSummary: any[] = [];
+    const warnings: string[] = [];
 
     let anyRelocated = false;
 
@@ -474,6 +475,35 @@ export function patchService(request: PatchRequest, allowedRoots: string[]) {
 
         if (currentHash !== payload.rawHash) {
           return formatError('TARGET_CHANGED', 'Target content has been modified.', { operation_index: i });
+        }
+      }
+
+      // Heuristic check for swallowed dollar signs
+      if (op.op === 'replace') {
+        const currentBytes = snapshot.bytes.subarray(startOffset, endOffset);
+        const originalText = new TextDecoder().decode(currentBytes);
+        const dollarRegex = /\$([0-9]+)/g;
+        let match;
+        while ((match = dollarRegex.exec(originalText)) !== null) {
+          const num = match[1];
+          const indexInReplacement = op.content.indexOf(num);
+          const hasDollarInReplacement = indexInReplacement >= 0 && op.content[indexInReplacement - 1] === '$';
+          
+          let shellAteDigit = false;
+          if (num.length > 1) {
+            for (let d = 1; d < num.length; d++) {
+              const suffix = num.slice(d);
+              if (op.content.includes(suffix) && !op.content.includes('$' + suffix)) {
+                shellAteDigit = true;
+                break;
+              }
+            }
+          }
+
+          if ((op.content.includes(num) && !hasDollarInReplacement) || shellAteDigit) {
+            warnings.push(`Potential swallowed '$' symbol detected. Original node contained '$${num}' but replacement has it missing or modified. Hint: Escape '$' as '\\$' or use '@filePath' to load content from a file.`);
+            break; // only warn once
+          }
         }
       }
 
@@ -556,7 +586,7 @@ export function patchService(request: PatchRequest, allowedRoots: string[]) {
         relocated: anyRelocated,
         diff,
         operations: operationsSummary,
-        warnings: []
+        warnings: warnings
       };
     }
 
@@ -578,7 +608,8 @@ export function patchService(request: PatchRequest, allowedRoots: string[]) {
       new_revision: newRevision,
       relocated: anyRelocated,
       diff,
-      operations: operationsSummary
+      operations: operationsSummary,
+      warnings: warnings
     };
   } catch (err: any) {
     if (err.message === 'COMMIT_RACE') {

@@ -133,6 +133,12 @@ function formatHumanFriendly(command: string, result: any): string {
       const rev = result.new_revision || result.result_revision || '';
       out += `Result/New Revision: ${rev}\n`;
       out += `Relocated: ${result.relocated ? 'Yes' : 'No'}\n`;
+      if (Array.isArray(result.warnings) && result.warnings.length > 0) {
+        out += `Warnings:\n`;
+        for (const w of result.warnings) {
+          out += `  ⚠️  ${w}\n`;
+        }
+      }
       out += `Diff:\n`;
       out += `----------------------------------------\n`;
       out += `${result.diff || 'No changes.'}\n`;
@@ -160,6 +166,13 @@ async function main() {
     args.splice(jsonIndex, 1);
   }
 
+  // Extract --raw flag
+  const rawIndex = args.indexOf('--raw');
+  const hasRawFlag = rawIndex !== -1;
+  if (hasRawFlag) {
+    args.splice(rawIndex, 1);
+  }
+
   const command = args[0];
 
   // Handle version queries
@@ -183,8 +196,8 @@ async function main() {
     console.error('  As command line tool:');
     console.error('    mdse inspect <filePath> [--json]');
     console.error('    mdse search <filePath> <query> [--json]');
-    console.error('    mdse read <filePath> <runtimeId1> [runtimeId2 ...] [--json]');
-    console.error('    mdse patch <filePath> <op: replace|delete|insert_before|insert_after> <anchorToken> [content] [--commit] [--json]');
+    console.error('    mdse read <filePath> <runtimeId1> [runtimeId2 ...] [--raw] [--json]');
+    console.error('    mdse patch <filePath> <op: replace|delete|insert_before|insert_after> <anchorToken> [content] [--commit] [--raw] [--json]');
     console.error('    mdse init [targetDir] [--json]');
     console.error('  As stdin/JSON tool (when no additional arguments are supplied):');
     console.error('    echo <JSON_PAYLOAD> | mdse <command>');
@@ -269,6 +282,12 @@ async function main() {
               console.error(`Error: Failed to read content file "${resolvedPath}": ${err.message}`);
               process.exit(64);
             }
+          } else if (!hasRawFlag) {
+            // Unescape \n, \r, \t by default unless --raw is passed
+            content = content
+              .replace(/\\n/g, '\n')
+              .replace(/\\r/g, '\r')
+              .replace(/\\t/g, '\t');
           }
         } else {
           console.error(`Error: "patch" operation "${op}" requires a content string. Hint: Specify the replacement content string as the last argument.`);
@@ -386,7 +405,12 @@ async function main() {
   }
 
   // Output formatting
-  if (useJson) {
+  if (command === 'read' && hasRawFlag && result.ok) {
+    if (Array.isArray(result.nodes)) {
+      const output = result.nodes.map((n: any) => n.content).join('\n');
+      console.log(output);
+    }
+  } else if (useJson) {
     console.log(JSON.stringify(result, null, 2));
   } else {
     console.log(formatHumanFriendly(command, result));

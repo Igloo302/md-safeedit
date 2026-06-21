@@ -171,5 +171,88 @@ describe('CLI Shell Execution and Exit Codes', () => {
     const updatedContent = fs.readFileSync(filePath, 'utf-8');
     expect(updatedContent).toContain('Updated content from file');
   });
+
+  it('unescapes escape sequences in patch content argument by default', () => {
+    // 1. Get outline to locate runtime ID of paragraph
+    const inspectRes = runCli(['inspect', filePath]);
+    const parsedInspect = JSON.parse(inspectRes.stdout);
+    const section = parsedInspect.outline[0];
+    
+    // 2. Read node to obtain token
+    const readRes = runCli(['read', filePath, section.runtime_id]);
+    const parsedRead = JSON.parse(readRes.stdout);
+    const token = parsedRead.nodes[0].anchor_token;
+    
+    // 3. Run patch by specifying content with literal \n
+    const patchRes = runCli(['patch', filePath, 'replace', token, '## Hello\\nLine1\\nLine2', '--commit']);
+    expect(patchRes.status).toBe(0);
+    
+    // 4. Confirm file content updated with real newlines
+    const updatedContent = fs.readFileSync(filePath, 'utf-8');
+    expect(updatedContent).toContain('Line1\nLine2');
+  });
+
+  it('keeps literal backslash-n in patch content when --raw is specified', () => {
+    // 1. Get outline to locate runtime ID of paragraph
+    const inspectRes = runCli(['inspect', filePath]);
+    const parsedInspect = JSON.parse(inspectRes.stdout);
+    const section = parsedInspect.outline[0];
+    
+    // 2. Read node to obtain token
+    const readRes = runCli(['read', filePath, section.runtime_id]);
+    const parsedRead = JSON.parse(readRes.stdout);
+    const token = parsedRead.nodes[0].anchor_token;
+    
+    // 3. Run patch by specifying content with literal \n and --raw flag
+    const patchRes = runCli(['patch', filePath, 'replace', token, '## Hello\\nLine3\\nLine4', '--commit', '--raw']);
+    expect(patchRes.status).toBe(0);
+    
+    // 4. Confirm file content has literal \\n
+    const updatedContent = fs.readFileSync(filePath, 'utf-8');
+    expect(updatedContent).toContain('Line3\\nLine4');
+  });
+
+  it('emits warnings when dollar signs are potentially swallowed by the shell', () => {
+    // 1. Create a file containing a dollar price
+    const dollarFile = path.join(tempDir, 'dollar.md');
+    fs.writeFileSync(dollarFile, '# Product\nThe price is $79 today.');
+    
+    const inspectRes = runCli(['inspect', dollarFile]);
+    const parsedInspect = JSON.parse(inspectRes.stdout);
+    const secNode = parsedInspect.outline[0]; // first section
+    
+    const readRes = runCli(['read', dollarFile, secNode.runtime_id]);
+    const parsedRead = JSON.parse(readRes.stdout);
+    const token = parsedRead.nodes[0].anchor_token;
+    
+    // 2. Try replacement where $79 becomes 79 (missing $)
+    const patchRes1 = runCli(['patch', dollarFile, 'replace', token, '# Product\nThe price is 79 today.']);
+    const parsedPatch1 = JSON.parse(patchRes1.stdout);
+    expect(parsedPatch1.warnings).toBeDefined();
+    expect(parsedPatch1.warnings.length).toBeGreaterThan(0);
+    expect(parsedPatch1.warnings[0]).toContain('swallowed');
+
+    // 3. Try replacement where $79 becomes 9 (missing $7)
+    const patchRes2 = runCli(['patch', dollarFile, 'replace', token, '# Product\nThe price is 9 today.']);
+    const parsedPatch2 = JSON.parse(patchRes2.stdout);
+    expect(parsedPatch2.warnings).toBeDefined();
+    expect(parsedPatch2.warnings.length).toBeGreaterThan(0);
+    expect(parsedPatch2.warnings[0]).toContain('swallowed');
+  });
+
+  it('prints only the raw content when read is called with --raw', () => {
+    const inspectRes = runCli(['inspect', filePath]);
+    const parsedInspect = JSON.parse(inspectRes.stdout);
+    const section = parsedInspect.outline[0];
+    
+    // Call read with --raw (non-JSON mode)
+    const readRes = runCli(['read', filePath, section.runtime_id, '--raw']);
+    expect(readRes.status).toBe(0);
+    
+    // Should print only the raw markdown of the section
+    expect(readRes.stdout).not.toContain('Runtime ID:');
+    expect(readRes.stdout).not.toContain('{');
+    expect(readRes.stdout).toContain('# Hello');
+  });
 });
 
