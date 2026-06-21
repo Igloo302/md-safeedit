@@ -16,7 +16,18 @@ MD SafeEdit 是一套专为 AI Agent（如 Cursor、Claude Code、Aider 等）�
 
 ---
 
-## 📦 安装 Agent Skill
+## 📦 分发优先级与架构
+
+根据您的集成环境与工作流，MD SafeEdit 采用以下分发层级：
+
+1. **Skill（主要产品入口）**：核心入口。引导 Agent 自动发现工具，并在不破坏原始 Markdown 文件的前题下，协调完整的“大纲 -> 读取 -> 预检 -> 提交”安全修改流。
+2. **CLI（主要执行方式）**：默认执行引擎。支持通过 `npx` 零系统污染按需调用，或在系统全局安装为可执行命令行工具。
+3. **Node.js Library（供其他项目集成）**：提供 `@md-safeedit/core` 与 `@md-safeedit/markdown` npm 依赖包，方便开发者在自己的 AI 项目或后端流水线中深度整合 CAS 安全校验与重定位引擎。
+4. **MCP（可选适配层）**：为 Cursor、Claude Desktop 等要求标准 Tool 级别 JSON-RPC 控制协议的客户端提供 stdio 桥接。
+
+---
+
+## 🚀 安装 Agent Skill
 
 MD SafeEdit 的核心定位是作为 **Agent Skill** 注入到 Agent 的工作上下文中。
 
