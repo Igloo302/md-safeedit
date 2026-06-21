@@ -81,9 +81,7 @@ mdse --version
 2. 定位配置文件路径：
    - **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
    - **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
-3. 读取该 JSON 文件（如不存在则创建一个空的对象 `{}`），并合并写入 `mcpServers.md-safeedit` 配置项：
-
-* **注意**：优先配置使用发布的 NPM 托管方式。如果您是开发者且需要用本地构建进行调试，可以将 `command` 改为 `"node"`，并将 `args` 设为指向您本地仓库的 `/packages/mcp/dist/index.js` 绝对路径。
+3. 在该配置文件中，合并写入以下 MCP 配置：
 
 ```json
 {
