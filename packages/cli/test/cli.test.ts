@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { execSync } from 'child_process';
+import { execSync, execFileSync } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -27,7 +27,7 @@ describe('CLI Shell Execution and Exit Codes', () => {
       const hasJsonFlags = args.includes('--json') || args.includes('--no-json');
       const finalArgs = hasJsonFlags ? args : [...args, '--json'];
       const cleanArgs = finalArgs.filter(a => a !== '--no-json');
-      const stdout = execSync(`node ${cliPath} ${cleanArgs.join(' ')}`, {
+      const stdout = execFileSync('node', [cliPath, ...cleanArgs], {
         input: stdinContent,
         encoding: 'utf-8',
         stdio: ['pipe', 'pipe', 'pipe'],
@@ -116,5 +116,32 @@ describe('CLI Shell Execution and Exit Codes', () => {
 
     const resVerNoJson = runCli(['-v', '--no-json']);
     expect(resVerNoJson.stdout).toContain('mdse CLI version:');
+  });
+
+  it('reads token from file using @ prefix during patch command', () => {
+    // 1. Get outline to locate runtime ID of paragraph
+    const inspectRes = runCli(['inspect', filePath]);
+    const parsedInspect = JSON.parse(inspectRes.stdout);
+    const section = parsedInspect.outline[0];
+    
+    // 2. Read node to obtain token
+    const readRes = runCli(['read', filePath, section.runtime_id]);
+    const parsedRead = JSON.parse(readRes.stdout);
+    const token = parsedRead.nodes[0].anchor_token;
+    
+    // 3. Write token to a temporary file
+    const tokenFilePath = path.join(tempDir, 'token-temp.txt');
+    fs.writeFileSync(tokenFilePath, token);
+    
+    // 4. Run patch by specifying @tokenFilePath as argument
+    const patchRes = runCli(['patch', filePath, 'replace', `@${tokenFilePath}`, '## Hello\nUpdated content\n', '--commit']);
+    expect(patchRes.status).toBe(0);
+    const parsedPatch = JSON.parse(patchRes.stdout);
+    expect(parsedPatch.ok).toBe(true);
+    expect(parsedPatch.status).toBe('committed');
+    
+    // 5. Confirm file content updated
+    const updatedContent = fs.readFileSync(filePath, 'utf-8');
+    expect(updatedContent).toContain('Updated content');
   });
 });

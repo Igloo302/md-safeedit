@@ -25,13 +25,13 @@ When encountering `TARGET_CHANGED`, `DOCUMENT_CHANGED`, or `COMMIT_RACE`, execut
 1. **Re-Inspect the Document**:
    Obtain the latest outline structure and document revision.
    ```bash
-   mdse inspect path/to/file.md --json
+   npx mdse inspect path/to/file.md --json
    ```
 
 2. **Re-Read the Target Node**:
    Retrieve the updated content and a fresh `anchor_token` for the target node.
    ```bash
-   mdse read path/to/file.md "node_runtime_id" --json
+   npx mdse read path/to/file.md "node_runtime_id" --json
    ```
 
 3. **Merge Edits Locally**:
@@ -41,8 +41,8 @@ When encountering `TARGET_CHANGED`, `DOCUMENT_CHANGED`, or `COMMIT_RACE`, execut
    Perform a dry-run first to verify the new token and revision, then write to disk.
    ```bash
    # Dry-run
-   mdse patch path/to/file.md replace "new_anchor_token" "Merged content" --json
+   npx mdse patch path/to/file.md replace "new_anchor_token" "Merged content" --json
    
    # Commit
-   mdse patch path/to/file.md replace "new_anchor_token" "Merged content" --commit --json
+   npx mdse patch path/to/file.md replace "new_anchor_token" "Merged content" --commit --json
    ```

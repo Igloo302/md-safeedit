@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import * as fs from 'fs';
+import * as path from 'path';
 import { createRequire } from 'module';
 import { 
   InspectRequestSchema, 
@@ -240,7 +241,17 @@ async function main() {
         process.exit(64);
       }
       const op = args[2];
-      const anchorToken = args[3];
+      let anchorToken = args[3];
+      if (anchorToken.startsWith('@')) {
+        const tokenFilePath = anchorToken.slice(1);
+        const resolvedPath = path.resolve(process.cwd(), tokenFilePath);
+        try {
+          anchorToken = fs.readFileSync(resolvedPath, 'utf-8').trim();
+        } catch (err: any) {
+          console.error(`Error: Failed to read token file "${resolvedPath}": ${err.message}`);
+          process.exit(64);
+        }
+      }
       
       const hasCommit = args.includes('--commit');
       const cleanArgs = args.filter(a => a !== '--commit');
