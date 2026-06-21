@@ -36,7 +36,7 @@
 | 用途 | 目录位置 | 示例 |
 |---|---|---|
 | 签名密钥与 session 配置 | `~/.md-safeedit/` | `~/.md-safeedit/secret.key` |
-| Agent 技能集 (Skill) | 目标项目根目录 `.agents/skills/md-safeedit/` | `SKILL.md`, `references/workflow.md` |
+| Agent 技能集 (Skill) | 由 Agent 自行决定的技能加载目录（例如 `.agents/skills/md-safeedit/`） | `SKILL.md`, `references/workflow.md` |
 | 持久包装器/可执行命令 | `~/.local/bin/` | `~/.local/bin/mdse` |
 | 临时缓存/预检文件 | `/tmp/` | `/tmp/.tmp-write.md` |
 
