@@ -283,11 +283,14 @@ async function main() {
               process.exit(64);
             }
           } else if (!hasRawFlag) {
-            // Unescape \n, \r, \t by default unless --raw is passed
-            content = content
-              .replace(/\\n/g, '\n')
-              .replace(/\\r/g, '\r')
-              .replace(/\\t/g, '\t');
+            // Unescape \n, \r, \t, and \\ by default unless --raw is passed
+            content = content.replace(/\\(.)/g, (match, char) => {
+              if (char === 'n') return '\n';
+              if (char === 'r') return '\r';
+              if (char === 't') return '\t';
+              if (char === '\\') return '\\';
+              return match;
+            });
           }
         } else {
           console.error(`Error: "patch" operation "${op}" requires a content string. Hint: Specify the replacement content string as the last argument.`);

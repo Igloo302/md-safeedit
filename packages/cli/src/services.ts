@@ -395,6 +395,36 @@ export function readService(request: ReadRequest, allowedRoots: string[]) {
   }
 }
 
+function isSwallowed(originalNum: string, replacement: string): boolean {
+  for (let i = 0; i < originalNum.length; i++) {
+    const suffix = originalNum.slice(i);
+    let idx = -1;
+    while ((idx = replacement.indexOf(suffix, idx + 1)) !== -1) {
+      const charBefore = idx > 0 ? replacement[idx - 1] : '';
+      const charAfter = idx + suffix.length < replacement.length ? replacement[idx + suffix.length] : '';
+      
+      const isPrecededByDigit = /[0-9]/.test(charBefore);
+      const isFollowedByDigit = /[0-9]/.test(charAfter);
+      
+      if (isPrecededByDigit || isFollowedByDigit) {
+        let start = idx;
+        while (start > 0 && /[0-9]/.test(replacement[start - 1])) {
+          start--;
+        }
+        const hasDollar = start > 0 && replacement[start - 1] === '$';
+        if (!hasDollar) {
+          return true;
+        }
+      } else {
+        if (charBefore !== '$') {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
 /**
  * Service: patch
  */
@@ -458,16 +488,16 @@ export function patchService(request: PatchRequest, allowedRoots: string[]) {
               candidate_count: candidates.length
             });
           }
+        } else {
+          startOffset = relocated.range.start;
+          endOffset = relocated.range.end;
+          isRelocated = true;
+          anyRelocated = true;
         }
-        
-        startOffset = relocated.range.start;
-        endOffset = relocated.range.end;
-        isRelocated = true;
-        anyRelocated = true;
       } else {
-        // Fast path: raw target hash check at range
-        if (startOffset < 0 || endOffset > snapshot.bytes.length) {
-          return formatError('TARGET_CHANGED', 'Target byte range is out of bounds in current document.', { operation_index: i });
+        // Fast-path byte-exact validation
+        if (!payload.range) {
+          return formatError('ANCHOR_INVALID', 'Anchor token is missing range info.', { operation_index: i });
         }
 
         const currentBytes = snapshot.bytes.subarray(startOffset, endOffset);
@@ -486,21 +516,7 @@ export function patchService(request: PatchRequest, allowedRoots: string[]) {
         let match;
         while ((match = dollarRegex.exec(originalText)) !== null) {
           const num = match[1];
-          const indexInReplacement = op.content.indexOf(num);
-          const hasDollarInReplacement = indexInReplacement >= 0 && op.content[indexInReplacement - 1] === '$';
-          
-          let shellAteDigit = false;
-          if (num.length > 1) {
-            for (let d = 1; d < num.length; d++) {
-              const suffix = num.slice(d);
-              if (op.content.includes(suffix) && !op.content.includes('$' + suffix)) {
-                shellAteDigit = true;
-                break;
-              }
-            }
-          }
-
-          if ((op.content.includes(num) && !hasDollarInReplacement) || shellAteDigit) {
+          if (isSwallowed(num, op.content)) {
             warnings.push(`Potential swallowed '$' symbol detected. Original node contained '$${num}' but replacement has it missing or modified. Hint: Escape '$' as '\\$' or use '@filePath' to load content from a file.`);
             break; // only warn once
           }

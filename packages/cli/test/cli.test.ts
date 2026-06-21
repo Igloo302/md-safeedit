@@ -183,13 +183,13 @@ describe('CLI Shell Execution and Exit Codes', () => {
     const parsedRead = JSON.parse(readRes.stdout);
     const token = parsedRead.nodes[0].anchor_token;
     
-    // 3. Run patch by specifying content with literal \n
-    const patchRes = runCli(['patch', filePath, 'replace', token, '## Hello\\nLine1\\nLine2', '--commit']);
+    // 3. Run patch by specifying content with literal \n and escaped backslash \\n
+    const patchRes = runCli(['patch', filePath, 'replace', token, '## Hello\\nLine1\\nLine2\\\\nEscaped', '--commit']);
     expect(patchRes.status).toBe(0);
     
-    // 4. Confirm file content updated with real newlines
+    // 4. Confirm file content updated with real newlines and escaped backslash-n
     const updatedContent = fs.readFileSync(filePath, 'utf-8');
-    expect(updatedContent).toContain('Line1\nLine2');
+    expect(updatedContent).toContain('Line1\nLine2\\nEscaped');
   });
 
   it('keeps literal backslash-n in patch content when --raw is specified', () => {
@@ -238,6 +238,18 @@ describe('CLI Shell Execution and Exit Codes', () => {
     expect(parsedPatch2.warnings).toBeDefined();
     expect(parsedPatch2.warnings.length).toBeGreaterThan(0);
     expect(parsedPatch2.warnings[0]).toContain('swallowed');
+
+    // 4. Try valid replacement where $79 becomes $89 (should NOT emit warning)
+    const patchRes3 = runCli(['patch', dollarFile, 'replace', token, '# Product\nThe price is $89 today.']);
+    const parsedPatch3 = JSON.parse(patchRes3.stdout);
+    expect(parsedPatch3.warnings).toBeDefined();
+    expect(parsedPatch3.warnings.length).toBe(0);
+
+    // 5. Try valid replacement where $79 becomes $179 (should NOT emit warning)
+    const patchRes4 = runCli(['patch', dollarFile, 'replace', token, '# Product\nThe price is $179 today.']);
+    const parsedPatch4 = JSON.parse(patchRes4.stdout);
+    expect(parsedPatch4.warnings).toBeDefined();
+    expect(parsedPatch4.warnings.length).toBe(0);
   });
 
   it('prints only the raw content when read is called with --raw', () => {
