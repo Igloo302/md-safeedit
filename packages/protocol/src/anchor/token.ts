@@ -83,19 +83,50 @@ function getOrCreateSecret(): Buffer {
   return newSecret;
 }
 
+function getTokensDir(): string {
+  return path.join(os.homedir(), '.md-safeedit', 'tokens');
+}
+
+function pruneExpiredTokens(): void {
+  try {
+    const dir = getTokensDir();
+    if (!fs.existsSync(dir)) return;
+    const files = fs.readdirSync(dir);
+    const now = Date.now();
+    const oneDayMs = 24 * 3600 * 1000;
+    for (const file of files) {
+      const filePath = path.join(dir, file);
+      try {
+        const stats = fs.statSync(filePath);
+        if (now - stats.mtimeMs > oneDayMs) {
+          fs.unlinkSync(filePath);
+        }
+      } catch {}
+    }
+  } catch {}
+}
+
 /**
  * Creates a signed, tamper-proof, opaque anchor token.
  */
 export function createToken(payload: AnchorPayloadV1): string {
-  const payloadStr = JSON.stringify(payload);
-  const compressed = zlib.deflateRawSync(Buffer.from(payloadStr));
-  const base64Payload = compressed.toString('base64url');
-  
+  pruneExpiredTokens();
+
+  // Generate a secure 9-byte ID (12 characters in base64url)
+  const tokenId = crypto.randomBytes(9).toString('base64url');
+
+  // Compute signature (first 8 characters of HMAC-SHA256)
   const hmac = crypto.createHmac('sha256', getSessionSecret());
-  hmac.update(base64Payload);
-  const signature = hmac.digest('base64url');
-  
-  return `mdse_a1_${base64Payload}.${signature}`;
+  hmac.update(tokenId);
+  const signature = hmac.digest('base64url').slice(0, 8);
+
+  // Save payload in ~/.md-safeedit/tokens/<tokenId>
+  const tokensDir = getTokensDir();
+  fs.mkdirSync(tokensDir, { recursive: true });
+  const tokenFile = path.join(tokensDir, tokenId);
+  fs.writeFileSync(tokenFile, JSON.stringify(payload), 'utf8');
+
+  return `mdse_a1_${tokenId}.${signature}`;
 }
 
 /**
@@ -112,32 +143,26 @@ export function verifyToken(token: string): AnchorPayloadV1 {
     throw new Error('ANCHOR_INVALID');
   }
 
-  const [base64Payload, signature] = parts;
+  const [tokenId, signature] = parts;
 
+  // Verify signature
   const hmac = crypto.createHmac('sha256', getSessionSecret());
-  hmac.update(base64Payload);
-  const expectedSignature = hmac.digest('base64url');
+  hmac.update(tokenId);
+  const expectedSignature = hmac.digest('base64url').slice(0, 8);
 
-  // Time-constant comparison to mitigate timing attacks
-  let isValid = false;
-  try {
-    isValid = crypto.timingSafeEqual(
-      Buffer.from(signature, 'base64url'),
-      Buffer.from(expectedSignature, 'base64url')
-    );
-  } catch {
-    isValid = false;
+  if (signature !== expectedSignature) {
+    throw new Error('ANCHOR_INVALID');
   }
 
-  if (!isValid) {
+  // Read payload file
+  const tokenFile = path.join(getTokensDir(), tokenId);
+  if (!fs.existsSync(tokenFile)) {
     throw new Error('ANCHOR_INVALID');
   }
 
   try {
-    const compressed = Buffer.from(base64Payload, 'base64url');
-    const payloadStr = zlib.inflateRawSync(compressed).toString('utf-8');
+    const payloadStr = fs.readFileSync(tokenFile, 'utf8');
     const payload = JSON.parse(payloadStr) as AnchorPayloadV1;
-
 
     if (payload.version !== 1) {
       throw new Error('ANCHOR_INVALID');
@@ -158,6 +183,8 @@ export function verifyToken(token: string): AnchorPayloadV1 {
     }
 
     if (payload.expiresAt && Date.now() > payload.expiresAt) {
+      // Auto-delete expired token file
+      try { fs.unlinkSync(tokenFile); } catch {}
       throw new Error('ANCHOR_EXPIRED');
     }
 

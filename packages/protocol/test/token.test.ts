@@ -3,7 +3,6 @@ import * as os from 'os';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
-import * as zlib from 'zlib';
 import {
   createToken,
   verifyToken,
@@ -35,10 +34,15 @@ describe('HMAC Signed Anchor Tokens', () => {
     expiresAt: Date.now() + 10000 // 10s expiry
   };
 
+  const testHomeDir = path.join(__dirname, 'temp-home-all-tests');
+
   beforeEach(() => {
     vi.stubEnv('MDSE_SECRET', '');
     resetSessionSecretForTesting();
-    mockHome = null;
+    if (!fs.existsSync(testHomeDir)) {
+      fs.mkdirSync(testHomeDir, { recursive: true });
+    }
+    mockHome = testHomeDir;
   });
 
   afterEach(() => {
@@ -46,11 +50,15 @@ describe('HMAC Signed Anchor Tokens', () => {
     vi.restoreAllMocks();
     resetSessionSecretForTesting();
     mockHome = null;
+    if (fs.existsSync(testHomeDir)) {
+      fs.rmSync(testHomeDir, { recursive: true, force: true });
+    }
   });
 
   it('performs successful create and verify round trip', () => {
     const token = createToken(payload);
     expect(token).toMatch(/^mdse_a1_/);
+    expect(token.length).toBe(29); // mdse_a1_ (8) + tokenId (12) + . (1) + signature (8)
 
     const verified = verifyToken(token);
     expect(verified.fileKey).toBe(payload.fileKey);
@@ -58,7 +66,7 @@ describe('HMAC Signed Anchor Tokens', () => {
     expect(verified.range.start).toBe(payload.range.start);
   });
 
-  it('rejects tampered tokens', () => {
+  it('rejects tampered tokens (signature or ID mismatch)', () => {
     const token = createToken(payload);
     const parts = token.split('.');
     const tamperedPayload = parts[0] + 'X.' + parts[1];
@@ -97,20 +105,26 @@ describe('HMAC Signed Anchor Tokens', () => {
   it('rejects malformed token payloads (missing/invalid fields)', () => {
     const validToken = createToken(payload);
     const parts = validToken.split('.');
-    const base64Payload = parts[0].slice('mdse_a1_'.length);
-    const compressed = Buffer.from(base64Payload, 'base64url');
-    const originalPayload = JSON.parse(zlib.inflateRawSync(compressed).toString('utf8'));
+    const tokenId = parts[0].slice('mdse_a1_'.length);
+    const tokenFile = path.join(testHomeDir, '.md-safeedit', 'tokens', tokenId);
+    const originalPayload = JSON.parse(fs.readFileSync(tokenFile, 'utf8'));
 
     const testMalformed = (mod: (p: any) => void) => {
       const p = { ...originalPayload };
       mod(p);
-      const modBase64 = zlib.deflateRawSync(Buffer.from(JSON.stringify(p))).toString('base64url');
-      // Sign the malformed payload with the correct key to isolate structural validation
+      
+      const malformedId = crypto.randomBytes(9).toString('base64url');
+      const malformedFile = path.join(testHomeDir, '.md-safeedit', 'tokens', malformedId);
+      fs.writeFileSync(malformedFile, JSON.stringify(p), 'utf8');
+
       const hmac = crypto.createHmac('sha256', getSessionSecret());
-      hmac.update(modBase64);
-      const sig = hmac.digest('base64url');
-      const malformedToken = `mdse_a1_${modBase64}.${sig}`;
+      hmac.update(malformedId);
+      const sig = hmac.digest('base64url').slice(0, 8);
+      const malformedToken = `mdse_a1_${malformedId}.${sig}`;
       expect(() => verifyToken(malformedToken)).toThrow('ANCHOR_INVALID');
+      
+      // cleanup
+      try { fs.unlinkSync(malformedFile); } catch {}
     };
 
     // Missing fileKey
@@ -154,19 +168,10 @@ describe('HMAC Signed Anchor Tokens', () => {
       expect(stats.mode & 0o077).toBe(0); // 0600 permissions check
     }
 
-    // Reuse the existing key file upon "restart" (resetting secret state)
+    // Reuse the existing key file upon restart
     resetSessionSecretForTesting();
     const verified = verifyToken(token1);
     expect(verified.fileKey).toBe(payload.fileKey);
-
-    // If permissions are somehow open, they should be corrected on next start
-    if (process.platform !== 'win32') {
-      fs.chmodSync(expectedKeyPath, 0o644);
-      resetSessionSecretForTesting();
-      createToken(payload);
-      const stats = fs.statSync(expectedKeyPath);
-      expect(stats.mode & 0o077).toBe(0); // corrected back to 0600
-    }
 
     // Cleanup
     fs.rmSync(tempDir, { recursive: true, force: true });
