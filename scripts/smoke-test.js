@@ -14,15 +14,26 @@ const tempDir = path.join(rootDir, 'temp-smoke-test');
 
 const packages = ['core', 'protocol', 'markdown', 'cli', 'mcp'];
 
-function cleanup() {
-  if (fs.existsSync(tempDir)) {
-    fs.rmSync(tempDir, { recursive: true, force: true });
+async function cleanup() {
+  if (!fs.existsSync(tempDir)) return;
+  const maxRetries = 10;
+  const delay = 100;
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+      return;
+    } catch (err) {
+      if (i === maxRetries - 1) {
+        throw err;
+      }
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
   }
 }
 
 async function run() {
   console.log('🧹 Cleaning up old temp smoke test folders...');
-  cleanup();
+  await cleanup();
   fs.mkdirSync(tempDir, { recursive: true });
 
   try {
@@ -82,7 +93,7 @@ async function run() {
     console.log('\n🎉 ALL SMOKE TESTS PASSED SUCCESSFULLY!');
   } finally {
     console.log('🧹 Cleaning up temp smoke test folders...');
-    cleanup();
+    await cleanup();
     // Also remove the local tarballs
     for (const pkg of packages) {
       const pkgDir = path.join(rootDir, 'packages', pkg);
@@ -104,6 +115,30 @@ function testMCPServer() {
       env: { ...process.env, MDSE_ALLOWED_ROOTS: tempDir }
     });
 
+    let finished = false;
+    let timeoutId;
+
+    function finish(err) {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timeoutId);
+
+      const done = () => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve();
+        }
+      };
+
+      if (mcpProcess.exitCode !== null || mcpProcess.signalCode !== null) {
+        done();
+      } else {
+        mcpProcess.once('close', done);
+        mcpProcess.kill();
+      }
+    }
+
     let stdoutData = '';
     mcpProcess.stdout.on('data', (chunk) => {
       stdoutData += chunk.toString();
@@ -116,7 +151,7 @@ function testMCPServer() {
     });
 
     mcpProcess.on('error', (err) => {
-      reject(new Error(`Failed to start MCP process: ${err.message}`));
+      finish(new Error(`Failed to start MCP process: ${err.message}`));
     });
 
     let state = 'INIT';
@@ -144,7 +179,7 @@ function testMCPServer() {
                 params: {}
               });
             } else {
-              reject(new Error(`MCP Server initialize failed: ${line}`));
+              finish(new Error(`MCP Server initialize failed: ${line}`));
             }
           } else if (state === 'LIST_TOOLS') {
             if (response.id === 2 && response.result && Array.isArray(response.result.tools)) {
@@ -153,13 +188,12 @@ function testMCPServer() {
               const expectedTools = ['inspect', 'search', 'read', 'patch'];
               const missing = expectedTools.filter(t => !tools.includes(t));
               if (missing.length > 0) {
-                reject(new Error(`MCP Server missing expected tools: ${missing.join(', ')}`));
+                finish(new Error(`MCP Server missing expected tools: ${missing.join(', ')}`));
               } else {
-                mcpProcess.kill();
-                resolve();
+                finish();
               }
             } else {
-              reject(new Error(`MCP Server tools/list failed: ${line}`));
+              finish(new Error(`MCP Server tools/list failed: ${line}`));
             }
           }
         } catch (e) {
@@ -185,9 +219,8 @@ function testMCPServer() {
     });
 
     // Timeout safety
-    setTimeout(() => {
-      mcpProcess.kill();
-      reject(new Error('MCP Server smoke test timed out.'));
+    timeoutId = setTimeout(() => {
+      finish(new Error('MCP Server smoke test timed out.'));
     }, 5000);
   });
 }
