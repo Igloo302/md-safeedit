@@ -2,6 +2,7 @@ import * as crypto from 'crypto';
 import * as os from 'os';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as zlib from 'zlib';
 
 export interface StructuralEvidence {
   pathFingerprint: string;
@@ -87,7 +88,8 @@ function getOrCreateSecret(): Buffer {
  */
 export function createToken(payload: AnchorPayloadV1): string {
   const payloadStr = JSON.stringify(payload);
-  const base64Payload = Buffer.from(payloadStr).toString('base64url');
+  const compressed = zlib.deflateRawSync(Buffer.from(payloadStr));
+  const base64Payload = compressed.toString('base64url');
   
   const hmac = crypto.createHmac('sha256', getSessionSecret());
   hmac.update(base64Payload);
@@ -132,8 +134,10 @@ export function verifyToken(token: string): AnchorPayloadV1 {
   }
 
   try {
-    const payloadStr = Buffer.from(base64Payload, 'base64url').toString('utf-8');
+    const compressed = Buffer.from(base64Payload, 'base64url');
+    const payloadStr = zlib.inflateRawSync(compressed).toString('utf-8');
     const payload = JSON.parse(payloadStr) as AnchorPayloadV1;
+
 
     if (payload.version !== 1) {
       throw new Error('ANCHOR_INVALID');

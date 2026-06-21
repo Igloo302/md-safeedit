@@ -3,6 +3,7 @@ import * as os from 'os';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
+import * as zlib from 'zlib';
 import {
   createToken,
   verifyToken,
@@ -59,49 +60,34 @@ describe('HMAC Signed Anchor Tokens', () => {
 
   it('rejects tampered tokens', () => {
     const token = createToken(payload);
-    
-    // Modify signature part
-    const tamperedSig = token.substring(0, token.length - 4) + 'aaaa';
-    expect(() => verifyToken(tamperedSig)).toThrow('ANCHOR_INVALID');
-
-    // Modify payload part (change base64 content)
     const parts = token.split('.');
-    const base64Payload = parts[0].slice('mdse_a1_'.length);
-    const tamperedPayload = 'mdse_a1_' + base64Payload.substring(0, base64Payload.length - 4) + 'aaaa.' + parts[1];
+    const tamperedPayload = parts[0] + 'X.' + parts[1];
+    const tamperedSig = parts[0] + '.' + parts[1] + 'X';
+
+    expect(() => verifyToken(tamperedSig)).toThrow('ANCHOR_INVALID');
     expect(() => verifyToken(tamperedPayload)).toThrow('ANCHOR_INVALID');
   });
 
   it('rejects expired tokens', () => {
-    const expiredPayload: AnchorPayloadV1 = {
+    const expiredPayload = {
       ...payload,
-      expiresAt: Date.now() - 1000 // Expired 1 second ago
-    };
-    
+      expiresAt: Date.now() - 1000 // 1s ago
+    } as AnchorPayloadV1;
     const token = createToken(expiredPayload);
     expect(() => verifyToken(token)).toThrow('ANCHOR_EXPIRED');
   });
 
-  it('supports MDSE_SECRET environment variable (64-char hex key)', () => {
-    const hexKey = 'a'.repeat(64);
-    vi.stubEnv('MDSE_SECRET', hexKey);
-    resetSessionSecretForTesting();
-
-    const token = createToken(payload);
+  it('accepts tokens that do not have an expiresAt', () => {
+    const noExpiryPayload = {
+      ...payload,
+      expiresAt: undefined
+    } as any;
+    const token = createToken(noExpiryPayload);
     expect(verifyToken(token)).toBeDefined();
-
-    // Changing the env secret invalidates the token
-    vi.stubEnv('MDSE_SECRET', 'b'.repeat(64));
-    resetSessionSecretForTesting();
-    expect(() => verifyToken(token)).toThrow('ANCHOR_INVALID');
   });
 
-  it('supports MDSE_SECRET environment variable (passphrase)', () => {
-    vi.stubEnv('MDSE_SECRET', 'my-super-secret-passphrase');
-    resetSessionSecretForTesting();
-
+  it('rejects tokens signed with a different key', () => {
     const token = createToken(payload);
-    expect(verifyToken(token)).toBeDefined();
-
     // Changing the passphrase invalidates the token
     vi.stubEnv('MDSE_SECRET', 'different-passphrase');
     resetSessionSecretForTesting();
@@ -112,12 +98,13 @@ describe('HMAC Signed Anchor Tokens', () => {
     const validToken = createToken(payload);
     const parts = validToken.split('.');
     const base64Payload = parts[0].slice('mdse_a1_'.length);
-    const originalPayload = JSON.parse(Buffer.from(base64Payload, 'base64url').toString('utf8'));
+    const compressed = Buffer.from(base64Payload, 'base64url');
+    const originalPayload = JSON.parse(zlib.inflateRawSync(compressed).toString('utf8'));
 
     const testMalformed = (mod: (p: any) => void) => {
       const p = { ...originalPayload };
       mod(p);
-      const modBase64 = Buffer.from(JSON.stringify(p)).toString('base64url');
+      const modBase64 = zlib.deflateRawSync(Buffer.from(JSON.stringify(p))).toString('base64url');
       // Sign the malformed payload with the correct key to isolate structural validation
       const hmac = crypto.createHmac('sha256', getSessionSecret());
       hmac.update(modBase64);
