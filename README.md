@@ -117,15 +117,20 @@ MD SafeEdit 严格遵守以下安全不变式（Safety Invariants）：
 ### 1. 安装方式
 
 * **免物理安装：配置持久包装脚本（推荐）**：
-  直接在用户可执行路径下配置包装器，它会通过 `npx` 自动执行最新版本，免去权限不足和环境污染的问题：
+  直接在用户可执行路径下配置包装器，并在本地静默安装依赖，执行速度极快（<50ms）且免除权限问题：
   ```bash
+  # 1. 在本地静默安装 CLI 与 MCP 核心依赖 (无需 sudo)
+  npm install --prefix ~/.md-safeedit @md-safeedit/cli@dev @md-safeedit/mcp@dev
+
+  # 2. 创建持久包装脚本并指向本地 node 路径
   mkdir -p ~/.local/bin
   cat << 'EOF' > ~/.local/bin/mdse
   #!/bin/sh
-  npx -y @md-safeedit/cli@dev "$@"
+  node "$HOME/.md-safeedit/node_modules/@md-safeedit/cli/dist/index.js" "$@"
   EOF
   chmod +x ~/.local/bin/mdse
-  # 确保 ~/.local/bin 已加入环境变量 PATH 中
+
+  # 3. 确保 ~/.local/bin 已加入环境变量 PATH 中
   export PATH="$HOME/.local/bin:$PATH"
   ```
 * **全局安装**：

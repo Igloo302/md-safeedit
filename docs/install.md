@@ -42,26 +42,31 @@
 
 ---
 
-### 🛠️ 步骤 1：配置 CLI 引擎包装器 (无需全局物理安装)
+### 🛠️ 步骤 1：配置 CLI 引擎包装器 (无需全局/管理员权限)
 
-为了避免全局安装 (`npm install -g`) 常见的权限报错与环境污染，我们将直接在用户的持久化可执行目录下创建一个轻量命令包装器：
+为了避免全局安装 (`npm install -g`) 常见的权限报错，同时保证执行速度（避免每次执行 `npx` 时进行 NPM 网络查询导致卡顿和超时），请执行以下步骤进行持久化本地配置：
 
-1. **自动创建用户 Bin 目录**：
+1. **在用户目录下静默安装 CLI 与 MCP 核心**（不需要 `sudo`，运行非常快）：
+   ```bash
+   npm install --prefix ~/.md-safeedit @md-safeedit/cli@dev @md-safeedit/mcp@dev
+   ```
+
+2. **自动创建用户 Bin 目录**：
    ```bash
    mkdir -p ~/.local/bin
    ```
 
-2. **写入 mdse 包装脚本**：
-   在 `~/.local/bin/mdse` 中写入以下包装逻辑，它会在调用时通过 `npx` 自动执行最新版本：
+3. **写入 mdse 包装脚本并指向本地 node 路径**：
+   在 `~/.local/bin/mdse` 中写入以下包装逻辑，它会直接通过 Node.js 调用本地代码，执行速度快（<50ms）且免去网络检查：
    ```bash
    cat << 'EOF' > ~/.local/bin/mdse
    #!/bin/sh
-   npx -y @md-safeedit/cli@dev "$@"
+   node "$HOME/.md-safeedit/node_modules/@md-safeedit/cli/dist/index.js" "$@"
    EOF
    chmod +x ~/.local/bin/mdse
    ```
 
-3. **确认环境变量 `PATH`**：
+4. **确认环境变量 `PATH`**：
    如果检测到用户的 `PATH` 未包含 `~/.local/bin`，请在最终汇报时提示用户在他们的 Shell 配置文件（如 `~/.zshrc` 或 `~/.bashrc`）中加入以下行，并运行 `source` 激活：
    ```bash
    export PATH="$HOME/.local/bin:$PATH"
