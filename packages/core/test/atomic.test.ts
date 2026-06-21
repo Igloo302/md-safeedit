@@ -4,12 +4,6 @@ import * as fs from 'fs';
 import * as crypto from 'crypto';
 import { atomicWriteFile } from '../src/writer/atomic.js';
 
-// Keep a reference to the real (un-mocked) fs for use in test teardown.
-// vi.mock replaces the module-level `fs`, so afterEach must use this reference
-// to avoid hitting the mocked rmSync which causes EPERM on Windows.
-import { createRequire } from 'module';
-const realFs: typeof import('fs') = createRequire(import.meta.url)('fs');
-
 vi.mock('fs', async () => {
   const actual = await vi.importActual<any>('fs');
   return {
@@ -33,11 +27,21 @@ describe('Atomic File Writer', () => {
     }
   });
 
-  afterEach(() => {
-    // Use the real (un-mocked) fs to clean up so that Windows does not get
-    // EPERM from the vi.mock proxy intercepting rmSync.
-    if (realFs.existsSync(tempDir)) {
-      realFs.rmSync(tempDir, { recursive: true, force: true });
+  afterEach(async () => {
+    // On Windows, the OS may not release file handles immediately after a
+    // failed write/rename.  Retry rmSync up to 5 times with a short delay.
+    const MAX_RETRIES = 5;
+    const DELAY_MS = 50;
+    for (let i = 0; i < MAX_RETRIES; i++) {
+      try {
+        if (fs.existsSync(tempDir)) {
+          fs.rmSync(tempDir, { recursive: true, force: true });
+        }
+        break; // success
+      } catch (e: any) {
+        if (i === MAX_RETRIES - 1) throw e; // re-throw on last attempt
+        await new Promise(res => setTimeout(res, DELAY_MS));
+      }
     }
   });
 

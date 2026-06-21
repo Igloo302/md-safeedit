@@ -141,7 +141,8 @@ export function atomicWriteFile(
     fs.closeSync(tempFd);
     tempFd = -1;
   } catch (err: any) {
-    // Always close the fd before attempting to delete on Windows
+    // Always close the fd before attempting to unlink.
+    // On Windows, an open fd prevents deletion (EPERM).
     if (tempFd !== -1) {
       try { fs.closeSync(tempFd); } catch {}
       tempFd = -1;
