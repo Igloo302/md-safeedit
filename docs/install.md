@@ -93,7 +93,7 @@ mdse --version
    请在您决定的加载目录下运行以下命令以自动初始化 Skill 模板及其参考文件（不指定参数时，默认初始化在当前路径的 `.agents/skills/md-safeedit` 中）：
    ```bash
    # 初始化到您指定的 Customization 目录：
-   npx mdse init [custom_skill_directory_path]
+   mdse init [custom_skill_directory_path]
    ```
 
 ---

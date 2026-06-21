@@ -23,7 +23,7 @@ graph TD
 Never read the entire file if you only need to modify a small portion. First, inspect the document layout to find the logical block runtime ID:
 - **Using CLI**:
   ```bash
-  npx mdse inspect path/to/file.md --json
+  mdse inspect path/to/file.md --json
   ```
 - **Using MCP**:
   Call the `inspect` tool with the file path.
@@ -31,7 +31,7 @@ Never read the entire file if you only need to modify a small portion. First, in
 If looking for specific text:
 - **Using CLI**:
   ```bash
-  npx mdse search path/to/file.md "search query" --json
+  mdse search path/to/file.md "search query" --json
   ```
 - **Using MCP**:
   Call the `search` tool with the file path and query.
@@ -40,7 +40,7 @@ If looking for specific text:
 Read the exact node you want to modify to get the content and the signed anchor token.
 - **Using CLI**:
   ```bash
-  npx mdse read path/to/file.md "section_runtime_id" --json
+  mdse read path/to/file.md "section_runtime_id" --json
   ```
 - **Using MCP**:
   Call the `read` tool with the runtime ID.
@@ -49,7 +49,7 @@ Read the exact node you want to modify to get the content and the signed anchor 
 Compute the edits in memory, then execute a **dry-run** patch to verify there are no overlaps or structural violations:
 - **Using CLI**:
   ```bash
-  npx mdse patch path/to/file.md replace "anchor_token" "New content string" --json
+  mdse patch path/to/file.md replace "anchor_token" "New content string" --json
   ```
 - **Using MCP**:
   Call the `patch` tool with `dry_run: true`.
@@ -58,7 +58,7 @@ Compute the edits in memory, then execute a **dry-run** patch to verify there ar
 Once the dry-run diff is verified, execute the write:
 - **Using CLI**:
   ```bash
-  npx mdse patch path/to/file.md replace "anchor_token" "New content string" --commit --json
+  mdse patch path/to/file.md replace "anchor_token" "New content string" --commit --json
   ```
 - **Using MCP**:
   Call the `patch` tool with `dry_run: false`.

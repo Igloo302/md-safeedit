@@ -17,9 +17,9 @@ Use this Skill to safely read and edit existing Markdown documents (`.md` or `.m
 3. **No Overwrite Bypasses**:
    - **NEVER bypass a conflict** (such as `TARGET_CHANGED` or `DOCUMENT_CHANGED`) by doing a full-file rewrite. Re-read the target node to obtain the latest state and retry the merge.
 4. **Tool Preference**:
-   - **Prefer local CLI** (`npx mdse`) for edits. MCP tools are also supported when available.
+   - **Prefer local CLI** (`mdse` or `npx mdse` as fallback) for edits. MCP tools are also supported when available.
 5. **Version Check**:
-   - Run `npx mdse --version` (or `mdse --version`) to ensure the engine is installed and responsive.
+   - Run `mdse --version` (or `npx mdse --version`) to ensure the engine is installed and responsive.
 
 ---
 
@@ -40,27 +40,27 @@ Commit Patch (Apply mutation to disk)
 ### 1. Version Compatibility Check
 Before starting any edit, check version compatibility:
 ```bash
-npx mdse --version
+mdse --version
 ```
 
 ### 2. Locate and Read
 Find the node `runtime_id` and acquire the signed `anchor_token`:
 ```bash
 # Outline structure
-npx mdse inspect path/to/document.md --json
+mdse inspect path/to/document.md --json
 
 # Read node content & token
-npx mdse read path/to/document.md "section_runtime_id" --json
+mdse read path/to/document.md "section_runtime_id" --json
 ```
 
 ### 3. Dry-run and Commit
 Apply the replacement. The patch defaults to dry-run (preview). Add `--commit` to write to disk:
 ```bash
 # Dry-run patch (Preview)
-npx mdse patch path/to/document.md replace "anchor_token_here" "New content" --json
+mdse patch path/to/document.md replace "anchor_token_here" "New content" --json
 
 # Commit patch
-npx mdse patch path/to/document.md replace "anchor_token_here" "New content" --commit --json
+mdse patch path/to/document.md replace "anchor_token_here" "New content" --commit --json
 ```
 
 ---
