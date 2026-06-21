@@ -596,16 +596,19 @@ export function initService(targetDir: string) {
     const templatesDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../templates');
     const destDir = path.resolve(targetDir, '.agents/skills/md-safeedit');
     const destRefsDir = path.join(destDir, 'references');
+    const destScriptsDir = path.join(destDir, 'scripts');
 
     // Create directories
     fs.mkdirSync(destRefsDir, { recursive: true });
+    fs.mkdirSync(destScriptsDir, { recursive: true });
 
     // Files to copy
     const files = [
       'SKILL.md',
       'references/workflow.md',
       'references/error-recovery.md',
-      'references/supported-markdown.md'
+      'references/supported-markdown.md',
+      'scripts/md-safeedit'
     ];
 
     for (const file of files) {
@@ -617,6 +620,15 @@ export function initService(targetDir: string) {
       }
       
       fs.copyFileSync(srcFile, destFile);
+
+      // Make script executable
+      if (file.startsWith('scripts/')) {
+        try {
+          fs.chmodSync(destFile, 0o755);
+        } catch (_) {
+          // Ignore windows permission errors
+        }
+      }
     }
 
     return {

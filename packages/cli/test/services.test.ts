@@ -188,8 +188,10 @@ describe('CLI Service Handlers', () => {
     
     const skillPath = path.join(initTempDir, '.agents/skills/md-safeedit/SKILL.md');
     const refPath = path.join(initTempDir, '.agents/skills/md-safeedit/references/workflow.md');
+    const scriptPath = path.join(initTempDir, '.agents/skills/md-safeedit/scripts/md-safeedit');
     expect(fs.existsSync(skillPath)).toBe(true);
     expect(fs.existsSync(refPath)).toBe(true);
+    expect(fs.existsSync(scriptPath)).toBe(true);
     
     // Verify contents
     const skillContent = fs.readFileSync(skillPath, 'utf-8');
