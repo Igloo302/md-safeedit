@@ -74,16 +74,22 @@ mdse --version
 
 ---
 
-### 📂 步骤 2：在当前项目工作区初始化 Agent Skill
+### 📂 步骤 2：在目标项目或全局初始化 Agent Skill
 
-为了让后续接手的 AI Agent 能够自动发现并遵循安全编辑协议，您（当前的 Agent）必须将 MD SafeEdit 的 Skill 规则文件写入到当前项目的技能集目录中。
+为了让后续接手的 AI Agent 能够自动发现并遵循安全编辑协议，您（当前的 Agent）必须将 MD SafeEdit 的 Skill 规则文件写入到对应的技能集加载目录中。
 
-请在项目根目录运行以下命令以自动初始化 Skill 模板：
+1. **决定 Skill 存放目录**：
+   不同的 AI 编程 Agent 有其独特的技能（Customization/Skill）发现机制与加载路径。例如：
+   * **Gemini Antigravity**：默认加载工作区项目根目录下的 `.agents/skills/md-safeedit/`。
+   * **Codex**：默认加载 `~/.codex/skills/md-safeedit/`。
+   * **其他 Agent**：请根据您自身的规范与环境定位加载根目录。
 
-```bash
-# 在当前工作区根目录下自动创建 .agents/skills/md-safeedit/ 目录及相关的参考文档
-mdse init
-```
+2. **自动初始化 Skill 模板**：
+   请在您决定的加载目录下运行以下命令以自动初始化 Skill 模板及其参考文件（不指定参数时，默认初始化在当前路径的 `.agents/skills/md-safeedit` 中）：
+   ```bash
+   # 初始化到您指定的 Customization 目录：
+   npx mdse init [custom_skill_directory_path]
+   ```
 
 ---
 
