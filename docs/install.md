@@ -146,7 +146,7 @@ mdse inspect README.md --json
 > 🎉 **MD SafeEdit 安装与配置成功！**
 > 
 > 1. **CLI 引擎** 已成功配置在持久路径中，可用版本为最新版本。
-> 2. **Agent Skill** 规则已配置到当前工作区的 `.agents/skills/md-safeedit/` 目录中。后续其他 Agent 进入该工作区时会自动加载并执行该安全修改流。
+> 2. **Agent Skill** 规则已成功配置到目标技能加载目录（如工作区的 `.agents/skills/md-safeedit/` 或全局对应的目录中）。后续 Agent 加载该技能后会自动执行安全修改流。
 > 3. **MCP 适配器** 已配置完成（如果您是在 Claude Desktop 下，服务已自动启动；如果是 Cursor，请确认已按照指引手动添加）。
 > 
 > 从现在开始，所有对 Markdown 文件的修改将自动接受 Compare-and-Swap (CAS) 防覆盖保护！
