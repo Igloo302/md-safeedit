@@ -16,11 +16,12 @@
 在当前项目工作区或系统全局安装并配置 **MD SafeEdit**，使当前及后续 Agent 在修改 Markdown 文档时自动遵循 Compare-and-Swap (CAS) 安全校验流。
 
 ### 💡 配置策略说明 (Configuration Strategy)
-请根据用户当前的 Agent 环境，选择对应的配置策略：
-1. **终端/命令行级 Agent（如 Claude Code, Aider 等）**：
-   - **配置策略**：**仅需安装 CLI 引擎**。此类 Agent 运行在终端 Shell 中，可直接通过 Skill 运行命令行工具。因此只需完成 **步骤 1 (CLI)** 与 **步骤 2 (Skill)**，**无需配置步骤 3 (MCP)**。
-2. **图形端/GUI级 Agent（如 Cursor, Claude Desktop 等）**：
-   - **配置策略**：**必须配置 MCP 适配层**。此类 GUI 客户端限制 Agent 在后台直接调用 shell 命令，必须通过 **步骤 3 (MCP)** 将工具桥接并注入到 IDE 中，由客户端调度。
+请根据用户当前的 Agent 环境，选择对应的配置策略。**请注意避免重复配置**：
+1. **终端/命令行级或支持原生 Plugin/Skill 的 Agent（如 Claude Code, Aider, Codex 等）**：
+   - **配置策略**：**仅需安装 CLI 引擎并配置本地 Skill/Plugin**。此类 Agent 运行在终端 Shell 中，可通过 Skill 规则直接运行命令行工具。因此只需完成 **步骤 1 (CLI)** 与 **步骤 2 (Skill)**，**无需配置步骤 3 (MCP)**。
+   - *注意：若此类 Agent 已经通过原生插件（如 Codex Plugin）或 Skill 目录加载了工具，则绝对不要再为其配置全局 MCP，否则会导致 Agent 识别出重复的同名工具，引起 token 浪费和调用冲突。*
+2. **图形端/GUI级 Agent（如 Cursor, Claude Desktop 等，且无法在后台直接调用 shell 命令的环境）**：
+   - **配置策略**：**配置 MCP 适配层**。此类 GUI 客户端限制 Agent 运行任意 shell 命令，必须通过 **步骤 3 (MCP)** 将工具桥接并注入到 IDE 中，由客户端调度。
 
 ### ⚠️ 执行边界 (Boundaries)
 在配置和排查问题时，请严格遵守以下安全红线：
