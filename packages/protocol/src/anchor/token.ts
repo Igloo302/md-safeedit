@@ -84,26 +84,35 @@ function getOrCreateSecret(): Buffer {
 }
 
 function getTokensDir(): string {
+  if (process.env.MDSE_TOKENS_DIR) {
+    return path.resolve(process.env.MDSE_TOKENS_DIR);
+  }
   return path.join(os.homedir(), '.md-safeedit', 'tokens');
 }
 
+function getLocalTokensDir(): string {
+  return path.join(process.cwd(), '.md-safeedit', 'tokens');
+}
+
 function pruneExpiredTokens(): void {
-  try {
-    const dir = getTokensDir();
-    if (!fs.existsSync(dir)) return;
-    const files = fs.readdirSync(dir);
-    const now = Date.now();
-    const oneDayMs = 24 * 3600 * 1000;
-    for (const file of files) {
-      const filePath = path.join(dir, file);
-      try {
-        const stats = fs.statSync(filePath);
-        if (now - stats.mtimeMs > oneDayMs) {
-          fs.unlinkSync(filePath);
-        }
-      } catch {}
-    }
-  } catch {}
+  const dirs = [getTokensDir(), getLocalTokensDir()];
+  const now = Date.now();
+  const oneDayMs = 24 * 3600 * 1000;
+  for (const dir of dirs) {
+    try {
+      if (!fs.existsSync(dir)) continue;
+      const files = fs.readdirSync(dir);
+      for (const file of files) {
+        const filePath = path.join(dir, file);
+        try {
+          const stats = fs.statSync(filePath);
+          if (now - stats.mtimeMs > oneDayMs) {
+            fs.unlinkSync(filePath);
+          }
+        } catch {}
+      }
+    } catch {}
+  }
 }
 
 /**
@@ -120,11 +129,26 @@ export function createToken(payload: AnchorPayloadV1): string {
   hmac.update(tokenId);
   const signature = hmac.digest('base64url').slice(0, 8);
 
-  // Save payload in ~/.md-safeedit/tokens/<tokenId>
+  // Save payload in configured directory, fallback to local workspace if EPERM/EACCES
   const tokensDir = getTokensDir();
-  fs.mkdirSync(tokensDir, { recursive: true });
-  const tokenFile = path.join(tokensDir, tokenId);
-  fs.writeFileSync(tokenFile, JSON.stringify(payload), 'utf8');
+  try {
+    fs.mkdirSync(tokensDir, { recursive: true });
+    const tokenFile = path.join(tokensDir, tokenId);
+    fs.writeFileSync(tokenFile, JSON.stringify(payload), 'utf8');
+  } catch (err: any) {
+    if (err.code === 'EPERM' || err.code === 'EACCES') {
+      const localDir = getLocalTokensDir();
+      try {
+        fs.mkdirSync(localDir, { recursive: true });
+        const localFile = path.join(localDir, tokenId);
+        fs.writeFileSync(localFile, JSON.stringify(payload), 'utf8');
+      } catch {
+        throw err;
+      }
+    } else {
+      throw err;
+    }
+  }
 
   return `mdse_a1_${tokenId}.${signature}`;
 }
@@ -154,8 +178,12 @@ export function verifyToken(token: string): AnchorPayloadV1 {
     throw new Error('ANCHOR_INVALID');
   }
 
-  // Read payload file
-  const tokenFile = path.join(getTokensDir(), tokenId);
+  // Find the token file in either default or local dir
+  let tokenFile = path.join(getTokensDir(), tokenId);
+  if (!fs.existsSync(tokenFile)) {
+    tokenFile = path.join(getLocalTokensDir(), tokenId);
+  }
+
   if (!fs.existsSync(tokenFile)) {
     throw new Error('ANCHOR_INVALID');
   }

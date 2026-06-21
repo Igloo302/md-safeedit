@@ -20,6 +20,25 @@ vi.mock('os', async (importOriginal) => {
   };
 });
 
+let mockFsWriteError: ((filePath: string) => boolean) | null = null;
+vi.mock('fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('fs')>();
+  return {
+    ...actual,
+    writeFileSync: (file: any, data: any, options: any) => {
+      if (mockFsWriteError) {
+        const filePath = typeof file === 'string' ? file : file.toString();
+        if (mockFsWriteError(filePath)) {
+          const err = new Error('EPERM: operation not permitted');
+          (err as any).code = 'EPERM';
+          throw err;
+        }
+      }
+      return actual.writeFileSync(file, data, options);
+    }
+  };
+});
+
 describe('HMAC Signed Anchor Tokens', () => {
   const payload: AnchorPayloadV1 = {
     version: 1,
@@ -175,5 +194,46 @@ describe('HMAC Signed Anchor Tokens', () => {
 
     // Cleanup
     fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it('respects MDSE_TOKENS_DIR environment variable override', () => {
+    const customDir = path.join(testHomeDir, 'custom-tokens-dir');
+    vi.stubEnv('MDSE_TOKENS_DIR', customDir);
+
+    const token = createToken(payload);
+    const parts = token.split('.');
+    const tokenId = parts[0].slice('mdse_a1_'.length);
+
+    const expectedFile = path.join(customDir, tokenId);
+    expect(fs.existsSync(expectedFile)).toBe(true);
+
+    const verified = verifyToken(token);
+    expect(verified.fileKey).toBe(payload.fileKey);
+  });
+
+  it('falls back to local workspace directory on EPERM/EACCES sandbox errors', () => {
+    // Setup fs mock trigger for write operations to mock home dir
+    mockFsWriteError = (filePath: string) => {
+      return filePath.includes('.md-safeedit') && filePath.includes(testHomeDir);
+    };
+
+    const token = createToken(payload);
+    const parts = token.split('.');
+    const tokenId = parts[0].slice('mdse_a1_'.length);
+
+    // Verify it wrote to the local workspace dir
+    const localDir = path.join(process.cwd(), '.md-safeedit', 'tokens');
+    const localFile = path.join(localDir, tokenId);
+    expect(fs.existsSync(localFile)).toBe(true);
+
+    // Verify token validation still succeeds by checking fallback
+    const verified = verifyToken(token);
+    expect(verified.fileKey).toBe(payload.fileKey);
+
+    // Restore fs mock trigger and cleanup
+    mockFsWriteError = null;
+    if (fs.existsSync(path.join(process.cwd(), '.md-safeedit'))) {
+      fs.rmSync(path.join(process.cwd(), '.md-safeedit'), { recursive: true, force: true });
+    }
   });
 });
