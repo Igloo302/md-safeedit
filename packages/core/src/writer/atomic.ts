@@ -133,13 +133,20 @@ export function atomicWriteFile(
   }
 
   // Write new content to temporary file and fsync it
-  let tempFd: number;
+  let tempFd: number = -1;
   try {
     tempFd = fs.openSync(tempFilePath, 'w', originalMode);
     fs.writeSync(tempFd, newBytes);
     fs.fsyncSync(tempFd);
     fs.closeSync(tempFd);
+    tempFd = -1;
   } catch (err: any) {
+    // Always close the fd before attempting to unlink.
+    // On Windows, an open fd prevents deletion (EPERM).
+    if (tempFd !== -1) {
+      try { fs.closeSync(tempFd); } catch {}
+      tempFd = -1;
+    }
     try {
       if (fs.existsSync(tempFilePath)) {
         fs.unlinkSync(tempFilePath);

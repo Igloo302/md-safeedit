@@ -27,9 +27,21 @@ describe('Atomic File Writer', () => {
     }
   });
 
-  afterEach(() => {
-    if (fs.existsSync(tempDir)) {
-      fs.rmSync(tempDir, { recursive: true, force: true });
+  afterEach(async () => {
+    // On Windows, the OS may not release file handles immediately after a
+    // failed write/rename.  Retry rmSync up to 5 times with a short delay.
+    const MAX_RETRIES = 5;
+    const DELAY_MS = 50;
+    for (let i = 0; i < MAX_RETRIES; i++) {
+      try {
+        if (fs.existsSync(tempDir)) {
+          fs.rmSync(tempDir, { recursive: true, force: true });
+        }
+        break; // success
+      } catch (e: any) {
+        if (i === MAX_RETRIES - 1) throw e; // re-throw on last attempt
+        await new Promise(res => setTimeout(res, DELAY_MS));
+      }
     }
   });
 

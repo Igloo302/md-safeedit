@@ -5,8 +5,14 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./dist/index.js",
-    "./services.js": "./dist/services.js"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./services.js": {
+      "types": "./dist/services.d.ts",
+      "default": "./dist/services.js"
+    }
   },
   "files": [
     "dist"
