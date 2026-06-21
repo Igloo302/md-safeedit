@@ -1,6 +1,6 @@
 {
   "name": "@md-safeedit/markdown",
-  "version": "0.1.2-dev",
+  "version": "0.1.3-dev",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -20,7 +20,7 @@
     "build": "tsc"
   },
   "dependencies": {
-    "@md-safeedit/core": "*",
+    "@md-safeedit/core": "^0.1.3-dev",
     "mdast-util-from-markdown": "^2.0.0",
     "mdast-util-gfm": "^3.0.0",
     "mdast-util-frontmatter": "^2.0.0",

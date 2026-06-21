@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
+import { fileURLToPath } from 'url';
 import { 
   createSnapshot, 
   applyEdits, 
@@ -81,7 +82,7 @@ export function formatError(code: string, message: string, details?: any): { ok:
       break;
     case 'VALIDATION_FAILED':
       retryable = false;
-      recommended_action = 'The resulting Markdown is invalid. Correct the replacement content.';
+      recommended_action = 'Request validation failed. Hint: Check your arguments. Run "mdse --help" to see command usage guidelines.';
       break;
     case 'COMMIT_RACE':
       retryable = true;
@@ -89,7 +90,11 @@ export function formatError(code: string, message: string, details?: any): { ok:
       break;
     case 'IO_ERROR':
       retryable = true;
-      recommended_action = 'A filesystem IO error occurred. Inspect system permissions or retry.';
+      if (message.includes('ENOENT') || message.toLowerCase().includes('no such file')) {
+        recommended_action = 'File not found. Hint: Check if the file path is correct. You can run "mdse inspect <filePath>" to verify.';
+      } else {
+        recommended_action = 'A filesystem IO error occurred. Inspect system permissions or retry.';
+      }
       break;
     default:
       retryable = false;
@@ -582,3 +587,45 @@ export function patchService(request: PatchRequest, allowedRoots: string[]) {
     return formatError('IO_ERROR', err.message || 'Failed to patch file.');
   }
 }
+
+/**
+ * Service: init-skill
+ */
+export function initService(targetDir: string) {
+  try {
+    const templatesDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../templates');
+    const destDir = path.resolve(targetDir, '.agents/skills/md-safeedit');
+    const destRefsDir = path.join(destDir, 'references');
+
+    // Create directories
+    fs.mkdirSync(destRefsDir, { recursive: true });
+
+    // Files to copy
+    const files = [
+      'SKILL.md',
+      'references/workflow.md',
+      'references/error-recovery.md',
+      'references/supported-markdown.md'
+    ];
+
+    for (const file of files) {
+      const srcFile = path.join(templatesDir, file);
+      const destFile = path.join(destDir, file);
+      
+      if (!fs.existsSync(srcFile)) {
+        throw new Error(`Template file not found in package: ${file}`);
+      }
+      
+      fs.copyFileSync(srcFile, destFile);
+    }
+
+    return {
+      ok: true,
+      message: `Successfully initialized Agent Skill in ${destDir}`,
+      dest_dir: destDir
+    };
+  } catch (err: any) {
+    return formatError('IO_ERROR', `Failed to initialize skill: ${err.message}`);
+  }
+}
+

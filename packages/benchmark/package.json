@@ -1,6 +1,6 @@
 {
   "name": "@md-safeedit/benchmark",
-  "version": "0.1.2-dev",
+  "version": "0.1.3-dev",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -16,9 +16,9 @@
     "run": "node dist/run.js"
   },
   "dependencies": {
-    "@md-safeedit/core": "*",
-    "@md-safeedit/markdown": "*",
-    "@md-safeedit/protocol": "*",
-    "@md-safeedit/cli": "*"
+    "@md-safeedit/core": "^0.1.3-dev",
+    "@md-safeedit/markdown": "^0.1.3-dev",
+    "@md-safeedit/protocol": "^0.1.3-dev",
+    "@md-safeedit/cli": "^0.1.3-dev"
   }
 }

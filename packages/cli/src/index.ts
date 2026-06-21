@@ -13,11 +13,12 @@ import {
   searchService, 
   readService, 
   patchService,
+  initService,
   formatError
 } from './services.js';
 
 const require = createRequire(import.meta.url);
-let cliVersion = '0.1.2-dev';
+let cliVersion = '0.1.3-dev';
 try {
   const pkg = require('../package.json');
   cliVersion = pkg.version;
@@ -137,6 +138,11 @@ function formatHumanFriendly(command: string, result: any): string {
       out += `----------------------------------------\n`;
       break;
     }
+    case 'init': {
+      out += `Message: ${result.message || ''}\n`;
+      out += `Destination Directory: ${result.dest_dir || ''}\n`;
+      break;
+    }
     default:
       out += JSON.stringify(result, null, 2);
   }
@@ -178,9 +184,22 @@ async function main() {
     console.error('    mdse search <filePath> <query> [--json]');
     console.error('    mdse read <filePath> <runtimeId1> [runtimeId2 ...] [--json]');
     console.error('    mdse patch <filePath> <op: replace|delete|insert_before|insert_after> <anchorToken> [content] [--commit] [--json]');
+    console.error('    mdse init [targetDir] [--json]');
     console.error('  As stdin/JSON tool (when no additional arguments are supplied):');
     console.error('    echo <JSON_PAYLOAD> | mdse <command>');
     process.exit(64);
+  }
+
+  if (command === 'init') {
+    const targetDir = args[1] || process.cwd();
+    const result = initService(targetDir);
+    if (hasJsonFlag) {
+      console.log(JSON.stringify(result, null, 2));
+    } else {
+      console.log(formatHumanFriendly(command, result));
+    }
+    const exitCode = result.ok ? 0 : 6;
+    process.exit(exitCode);
   }
 
   // Determine if we should output JSON
@@ -198,7 +217,7 @@ async function main() {
       };
     } else if (command === 'search') {
       if (args.length < 3) {
-        console.error('Error: "search" requires a query string argument.');
+        console.error('Error: "search" requires a query string argument. Hint: Run "mdse search <filePath> <query>".');
         process.exit(64);
       }
       jsonPayload = {
@@ -207,7 +226,7 @@ async function main() {
       };
     } else if (command === 'read') {
       if (args.length < 3) {
-        console.error('Error: "read" requires at least one runtime ID.');
+        console.error('Error: "read" requires at least one runtime ID. Hint: Run "mdse read <filePath> <runtimeId1> ...".');
         process.exit(64);
       }
       const runtimeIds = args.slice(2);
@@ -217,7 +236,7 @@ async function main() {
       };
     } else if (command === 'patch') {
       if (args.length < 4) {
-        console.error('Error: "patch" requires operation (replace|delete|insert_before|insert_after) and anchor token.');
+        console.error('Error: "patch" requires operation (replace|delete|insert_before|insert_after) and anchor token. Hint: Run "mdse patch <filePath> <op> <anchorToken> [content] [--commit]".');
         process.exit(64);
       }
       const op = args[2];
@@ -231,7 +250,7 @@ async function main() {
         if (potentialContent) {
           content = potentialContent;
         } else {
-          console.error(`Error: "patch" operation "${op}" requires a content string.`);
+          console.error(`Error: "patch" operation "${op}" requires a content string. Hint: Specify the replacement content string as the last argument.`);
           process.exit(64);
         }
       }

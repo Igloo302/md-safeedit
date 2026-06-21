@@ -5,7 +5,8 @@ import {
   inspectService, 
   searchService, 
   readService, 
-  patchService 
+  patchService,
+  initService
 } from '../src/services.js';
 
 const tempDir = path.join(process.cwd(), 'packages/cli/test-temp');
@@ -175,5 +176,23 @@ describe('CLI Service Handlers', () => {
     const content = fs.readFileSync(fullPath, 'utf-8');
     expect(content).toContain('Updated text in relocated section.');
     expect(content).toContain('# Preface'); // Untouched parts are preserved
+  });
+
+  it('initializes agent skill templates successfully', () => {
+    const initTempDir = path.join(tempDir, 'init-project');
+    fs.mkdirSync(initTempDir, { recursive: true });
+    
+    const res = initService(initTempDir) as any;
+    expect(res.ok).toBe(true);
+    expect(res.message).toContain('Successfully initialized Agent Skill');
+    
+    const skillPath = path.join(initTempDir, '.agents/skills/md-safeedit/SKILL.md');
+    const refPath = path.join(initTempDir, '.agents/skills/md-safeedit/references/workflow.md');
+    expect(fs.existsSync(skillPath)).toBe(true);
+    expect(fs.existsSync(refPath)).toBe(true);
+    
+    // Verify contents
+    const skillContent = fs.readFileSync(skillPath, 'utf-8');
+    expect(skillContent).toContain('MD SafeEdit');
   });
 });

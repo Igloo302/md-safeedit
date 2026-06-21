@@ -1,6 +1,6 @@
 {
   "name": "@md-safeedit/protocol",
-  "version": "0.1.2-dev",
+  "version": "0.1.3-dev",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -20,7 +20,7 @@
     "build": "tsc"
   },
   "dependencies": {
-    "@md-safeedit/core": "*",
+    "@md-safeedit/core": "^0.1.3-dev",
     "zod": "^3.22.4"
   }
 }

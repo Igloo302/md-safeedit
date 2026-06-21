@@ -1,6 +1,6 @@
 {
   "name": "@md-safeedit/core",
-  "version": "0.1.2-dev",
+  "version": "0.1.3-dev",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
