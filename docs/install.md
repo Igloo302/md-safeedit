@@ -42,22 +42,32 @@
 
 ---
 
-### 🛠️ 步骤 1：全局或本地安装 CLI 引擎
+### 🛠️ 步骤 1：配置 CLI 引擎包装器 (无需全局物理安装)
 
-优先推荐在用户系统上安装全局 CLI 软链接（若无权限，后续运行流程会退化为通过 `npx -y @md-safeedit/cli@dev` 按需调用）：
+为了避免全局安装 (`npm install -g`) 常见的权限报错与环境污染，我们将直接在用户的持久化可执行目录下创建一个轻量命令包装器：
 
-```bash
-# 全局安装 CLI 与 MCP 适配器 (指定使用开发预览 tag)
-npm install -g @md-safeedit/cli@dev @md-safeedit/mcp@dev
-```
+1. **自动创建用户 Bin 目录**：
+   ```bash
+   mkdir -p ~/.local/bin
+   ```
 
-#### 权限不足时的 Fallback 机制：
-如果由于全局安装目录权限限制导致安装失败，**请勿使用 `sudo`**，应自动执行以下步骤在持久的用户目录下创建命令包装器：
-1. 确保用户可执行目录已创建：`mkdir -p ~/.local/bin`
-2. 在该目录下写入一个软链接或包装器脚本（例如将 `npx @md-safeedit/cli@dev "$@"` 写入 `~/.local/bin/mdse` 并赋予执行权限 `chmod +x ~/.local/bin/mdse`）。
-3. 检查系统环境变量 `PATH`，如果未包含 `~/.local/bin`，请在汇报时提示用户将其加入 shell 配置。
+2. **写入 mdse 包装脚本**：
+   在 `~/.local/bin/mdse` 中写入以下包装逻辑，它会在调用时通过 `npx` 自动执行最新版本：
+   ```bash
+   cat << 'EOF' > ~/.local/bin/mdse
+   #!/bin/sh
+   npx -y @md-safeedit/cli@dev "$@"
+   EOF
+   chmod +x ~/.local/bin/mdse
+   ```
 
-运行以下命令校验安装是否成功，并获取当前版本：
+3. **确认环境变量 `PATH`**：
+   如果检测到用户的 `PATH` 未包含 `~/.local/bin`，请在最终汇报时提示用户在他们的 Shell 配置文件（如 `~/.zshrc` 或 `~/.bashrc`）中加入以下行，并运行 `source` 激活：
+   ```bash
+   export PATH="$HOME/.local/bin:$PATH"
+   ```
+
+运行以下命令校验包装器是否可以正常工作：
 ```bash
 mdse --version
 ```
