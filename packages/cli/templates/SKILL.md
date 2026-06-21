@@ -19,7 +19,7 @@ Use this Skill to safely read and edit existing Markdown documents (`.md` or `.m
 4. **Tool Preference**:
    - **Prefer local CLI** (`npx mdse`) for edits. MCP tools are also supported when available.
 5. **Version Check**:
-   - Run the helper script `.agents/skills/md-safeedit/scripts/md-safeedit check` to ensure compatibility.
+   - Run `npx mdse --version` (or `mdse --version`) to ensure the engine is installed and responsive.
 
 ---
 
@@ -40,7 +40,7 @@ Commit Patch (Apply mutation to disk)
 ### 1. Version Compatibility Check
 Before starting any edit, check version compatibility:
 ```bash
-node .agents/skills/md-safeedit/scripts/md-safeedit check
+npx mdse --version
 ```
 
 ### 2. Locate and Read
