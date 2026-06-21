@@ -3,6 +3,11 @@ import path from 'path';
 import { execSync, spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 
+// On Windows, executables like `npx` and `npm` are .cmd files and require
+// shell: true to be found by spawn/execSync without an absolute path.
+const IS_WINDOWS = process.platform === 'win32';
+const SHELL_OPT = IS_WINDOWS ? { shell: true } : {};
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
 const tempDir = path.join(rootDir, 'temp-smoke-test');
@@ -53,7 +58,7 @@ async function run() {
     
     // Inspect
     console.log('   Running: mdse inspect');
-    const inspectOut = execSync(`npx mdse inspect "${sampleMd}"`, { cwd: tempDir }).toString();
+    const inspectOut = execSync(`npx mdse inspect "${sampleMd}"`, { cwd: tempDir, ...SHELL_OPT }).toString();
     const inspectJson = JSON.parse(inspectOut);
     if (!inspectJson.ok || !inspectJson.document) {
       throw new Error(`CLI inspect output validation failed: ${inspectOut}`);
@@ -62,7 +67,7 @@ async function run() {
 
     // Search
     console.log('   Running: mdse search');
-    const searchOut = execSync(`npx mdse search "${sampleMd}" "paragraph"`, { cwd: tempDir }).toString();
+    const searchOut = execSync(`npx mdse search "${sampleMd}" "paragraph"`, { cwd: tempDir, ...SHELL_OPT }).toString();
     const searchJson = JSON.parse(searchOut);
     if (!searchJson.ok || !Array.isArray(searchJson.matches)) {
       throw new Error(`CLI search output validation failed: ${searchOut}`);
@@ -92,8 +97,10 @@ async function run() {
 function testMCPServer() {
   return new Promise((resolve, reject) => {
     // Spawn npx md-safeedit-mcp
+    // shell:true is required on Windows where npx is npx.cmd, not a bare binary.
     const mcpProcess = spawn('npx', ['md-safeedit-mcp'], {
       cwd: tempDir,
+      shell: IS_WINDOWS,
       env: { ...process.env, MDSE_ALLOWED_ROOTS: tempDir }
     });
 
