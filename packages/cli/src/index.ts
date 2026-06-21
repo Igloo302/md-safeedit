@@ -17,7 +17,7 @@ import {
 } from './services.js';
 
 const require = createRequire(import.meta.url);
-let cliVersion = '0.1.1-dev';
+let cliVersion = '0.1.2-dev';
 try {
   const pkg = require('../package.json');
   cliVersion = pkg.version;
