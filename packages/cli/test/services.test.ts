@@ -197,4 +197,21 @@ describe('CLI Service Handlers', () => {
     const skillContent = fs.readFileSync(skillPath, 'utf-8');
     expect(skillContent).toContain('MD SafeEdit');
   });
+
+  it('initializes directly in directory if target path ends with skills/md-safeedit', () => {
+    const initTempDir = path.join(tempDir, 'custom-agent/skills/md-safeedit');
+    fs.mkdirSync(initTempDir, { recursive: true });
+    
+    const res = initService(initTempDir) as any;
+    expect(res.ok).toBe(true);
+    expect(res.dest_dir).toBe(path.resolve(initTempDir));
+    
+    const skillPath = path.join(initTempDir, 'SKILL.md');
+    const refPath = path.join(initTempDir, 'references/workflow.md');
+    const scriptPath = path.join(initTempDir, 'scripts/md-safeedit');
+    expect(fs.existsSync(skillPath)).toBe(true);
+    expect(fs.existsSync(refPath)).toBe(true);
+    expect(fs.existsSync(scriptPath)).toBe(true);
+  });
 });
+

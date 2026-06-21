@@ -594,9 +594,16 @@ export function patchService(request: PatchRequest, allowedRoots: string[]) {
 export function initService(targetDir: string) {
   try {
     const templatesDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../templates');
-    const destDir = path.resolve(targetDir, '.agents/skills/md-safeedit');
+    
+    let destDir = path.resolve(targetDir);
+    const normalizedTarget = targetDir.replace(/[\\/]+$/, '').replace(/\\/g, '/');
+    if (!normalizedTarget.endsWith('skills/md-safeedit')) {
+      destDir = path.join(destDir, '.agents/skills/md-safeedit');
+    }
+    
     const destRefsDir = path.join(destDir, 'references');
     const destScriptsDir = path.join(destDir, 'scripts');
+
 
     // Create directories
     fs.mkdirSync(destRefsDir, { recursive: true });
