@@ -67,15 +67,12 @@ mdse --version
 
 为了让后续接手的 AI Agent 能够自动发现并遵循安全编辑协议，您（当前的 Agent）必须将 MD SafeEdit 的 Skill 规则文件写入到当前项目的技能集目录中。
 
-请在项目根目录创建并写入以下文件结构：
-- **技能文件路径**：`.agents/skills/md-safeedit/SKILL.md`
-- **参考文件路径**：
-  - `.agents/skills/md-safeedit/references/workflow.md`
-  - `.agents/skills/md-safeedit/references/error-recovery.md`
-  - `.agents/skills/md-safeedit/references/supported-markdown.md`
+请在项目根目录运行以下命令以自动初始化 Skill 模板：
 
-你可以直接使用当前项目自带的 `.agents/skills/md-safeedit/` 目录中的模板文件。如果目标项目没有集成，请创建目录并从本项目拷贝以下文件：
-* `SKILL.md` 模板：[.agents/skills/md-safeedit/SKILL.md](file:///.agents/skills/md-safeedit/SKILL.md)
+```bash
+# 在当前工作区根目录下自动创建 .agents/skills/md-safeedit/ 目录及相关的参考文档
+mdse init
+```
 
 ---
 
