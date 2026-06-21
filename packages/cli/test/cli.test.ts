@@ -144,4 +144,32 @@ describe('CLI Shell Execution and Exit Codes', () => {
     const updatedContent = fs.readFileSync(filePath, 'utf-8');
     expect(updatedContent).toContain('Updated content');
   });
+
+  it('reads content from file using @ prefix during patch command', () => {
+    // 1. Get outline to locate runtime ID of paragraph
+    const inspectRes = runCli(['inspect', filePath]);
+    const parsedInspect = JSON.parse(inspectRes.stdout);
+    const section = parsedInspect.outline[0];
+    
+    // 2. Read node to obtain token
+    const readRes = runCli(['read', filePath, section.runtime_id]);
+    const parsedRead = JSON.parse(readRes.stdout);
+    const token = parsedRead.nodes[0].anchor_token;
+    
+    // 3. Write content to a temporary file
+    const contentFilePath = path.join(tempDir, 'content-temp.txt');
+    fs.writeFileSync(contentFilePath, '## Hello\nUpdated content from file\n');
+    
+    // 4. Run patch by specifying @contentFilePath as the content argument
+    const patchRes = runCli(['patch', filePath, 'replace', token, `@${contentFilePath}`, '--commit']);
+    expect(patchRes.status).toBe(0);
+    const parsedPatch = JSON.parse(patchRes.stdout);
+    expect(parsedPatch.ok).toBe(true);
+    expect(parsedPatch.status).toBe('committed');
+    
+    // 5. Confirm file content updated
+    const updatedContent = fs.readFileSync(filePath, 'utf-8');
+    expect(updatedContent).toContain('Updated content from file');
+  });
 });
+

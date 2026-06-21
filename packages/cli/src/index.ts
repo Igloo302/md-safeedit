@@ -260,6 +260,16 @@ async function main() {
         const potentialContent = cleanArgs[4];
         if (potentialContent) {
           content = potentialContent;
+          if (content.startsWith('@')) {
+            const contentFilePath = content.slice(1);
+            const resolvedPath = path.resolve(process.cwd(), contentFilePath);
+            try {
+              content = fs.readFileSync(resolvedPath, 'utf-8');
+            } catch (err: any) {
+              console.error(`Error: Failed to read content file "${resolvedPath}": ${err.message}`);
+              process.exit(64);
+            }
+          }
         } else {
           console.error(`Error: "patch" operation "${op}" requires a content string. Hint: Specify the replacement content string as the last argument.`);
           process.exit(64);

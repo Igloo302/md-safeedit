@@ -361,7 +361,7 @@ export function readService(request: ReadRequest, allowedRoots: string[]) {
         blockId: node.blockId,
         dialect: 'commonmark+gfm',
         issuedAt: Date.now(),
-        expiresAt: Date.now() + (parseInt(process.env.MDSE_TOKEN_TTL_MS ?? '3600000', 10) || 3600000) // default 1 hour, configurable via MDSE_TOKEN_TTL_MS
+        expiresAt: Date.now() + (parseInt(process.env.MDSE_TOKEN_TTL_MS ?? '86400000', 10) || 86400000) // default 24 hours, configurable via MDSE_TOKEN_TTL_MS
       };
 
       const token = createToken(payload);

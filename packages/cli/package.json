@@ -1,6 +1,6 @@
 {
   "name": "@md-safeedit/cli",
-  "version": "0.1.5-dev",
+  "version": "0.1.6-dev",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -25,9 +25,9 @@
     "build": "tsc"
   },
   "dependencies": {
-    "@md-safeedit/core": "^0.1.5-dev",
-    "@md-safeedit/markdown": "^0.1.5-dev",
-    "@md-safeedit/protocol": "^0.1.5-dev"
+    "@md-safeedit/core": "^0.1.6-dev",
+    "@md-safeedit/markdown": "^0.1.6-dev",
+    "@md-safeedit/protocol": "^0.1.6-dev"
   },
   "bin": {
     "mdse": "dist/index.js"
