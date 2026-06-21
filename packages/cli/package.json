@@ -29,6 +29,6 @@
     "@md-safeedit/protocol": "*"
   },
   "bin": {
-    "mdse": "./dist/index.js"
+    "mdse": "dist/index.js"
   }
 }
