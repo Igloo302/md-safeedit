@@ -2,7 +2,7 @@
 
 ## For Humans / 面向用户
 
-将以下指令复制给您的 AI 编程 Agent（例如 Claude Code、Cursor Agent、Aider 等），它将自动阅读本指南并为您完成一键配置：
+将以下指令复制给您的 AI 编程 Agent（例如 Claude Code、Cursor Agent 等），它将自动阅读本指南并为您完成一键配置：
 
 ```text
 帮我安装并配置 MD SafeEdit：https://raw.githubusercontent.com/Igloo302/md-safeedit/main/docs/install.md
@@ -20,6 +20,7 @@
 - **禁止** 未经用户显式同意运行 `sudo` 命令。
 - **禁止** 修改系统关键配置文件，配置仅限于用户目录（如 `~/.md-safeedit/` 或 IDE 配置目录）。
 - **禁止** 绕过安全审计。在写入文档前，必须引导当前工作流使用 MD SafeEdit 的 `inspect` -> `read` -> `patch` 流程。
+- **禁止** 将可执行软链接或包装器（wrapper）脚本放置在 `/tmp`、`/private/tmp` 等临时/易失性目录中（因为 macOS/Linux 系统会在重启时清空它们）。所有包装器必须写入持久的用户级 bin 目录（优先选用 `~/.local/bin/`，并在必要时提示用户将其加入 `PATH`）。
 
 ### 📁 目录规范 (Directory Rules)
 所有的配置文件和分发文件均应放置在规范目录中：
@@ -28,6 +29,7 @@
 |---|---|---|
 | 签名密钥与 session 配置 | `~/.md-safeedit/` | `~/.md-safeedit/secret.key` |
 | Agent 技能集 (Skill) | 目标项目根目录 `.agents/skills/md-safeedit/` | `SKILL.md`, `references/workflow.md` |
+| 持久包装器/可执行命令 | `~/.local/bin/` | `~/.local/bin/mdse` |
 | 临时缓存/预检文件 | `/tmp/` | `/tmp/.tmp-write.md` |
 
 ---
@@ -41,11 +43,16 @@
 npm install -g @md-safeedit/cli@dev @md-safeedit/mcp@dev
 ```
 
+#### 权限不足时的 Fallback 机制：
+如果由于全局安装目录权限限制导致安装失败，**请勿使用 `sudo`**，应自动执行以下步骤在持久的用户目录下创建命令包装器：
+1. 确保用户可执行目录已创建：`mkdir -p ~/.local/bin`
+2. 在该目录下写入一个软链接或包装器脚本（例如将 `npx @md-safeedit/cli@dev "$@"` 写入 `~/.local/bin/mdse` 并赋予执行权限 `chmod +x ~/.local/bin/mdse`）。
+3. 检查系统环境变量 `PATH`，如果未包含 `~/.local/bin`，请在汇报时提示用户将其加入 shell 配置。
+
 运行以下命令校验安装是否成功，并获取当前版本：
 ```bash
 mdse --version
 ```
-如果输出类似 `mdse CLI version: 0.1.2-dev`，说明安装成功！
 
 ---
 
@@ -75,6 +82,8 @@ mdse --version
    - **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
    - **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
 3. 读取该 JSON 文件（如不存在则创建一个空的对象 `{}`），并合并写入 `mcpServers.md-safeedit` 配置项：
+
+* **注意**：优先配置使用发布的 NPM 托管方式。如果您是开发者且需要用本地构建进行调试，可以将 `command` 改为 `"node"`，并将 `args` 设为指向您本地仓库的 `/packages/mcp/dist/index.js` 绝对路径。
 
 ```json
 {
@@ -117,7 +126,7 @@ mdse inspect README.md --json
 完成上述配置后，请向用户回复汇报：
 > 🎉 **MD SafeEdit 安装与配置成功！**
 > 
-> 1. **CLI 引擎** 已成功安装，版本为 `0.1.2-dev`。
+> 1. **CLI 引擎** 已成功配置在持久路径中，可用版本为最新版本。
 > 2. **Agent Skill** 规则已配置到当前工作区的 `.agents/skills/md-safeedit/` 目录中。后续其他 Agent 进入该工作区时会自动加载并执行该安全修改流。
 > 3. **MCP 适配器** 已配置完成（如果您是在 Claude Desktop 下，服务已自动启动；如果是 Cursor，请确认已按照指引手动添加）。
 > 
