@@ -3,15 +3,27 @@ name: md-safeedit
 description: Safe, structure-aware Markdown editing using the Compare-and-Swap (CAS) signature-guarded protocol via CLI or MCP.
 ---
 
-# MD SafeEdit Skill
+# MD SafeEdit Customization Skill
 
-Use this Skill to safely read and edit Markdown documents (`.md` or `.markdown`) without causing formatting loss, fuzzy-match corruption, or silent concurrent overrides.
+Use this Skill to safely read and edit existing Markdown documents (`.md` or `.markdown`) without causing formatting loss, fuzzy-match corruption, or silent concurrent overrides.
+
+## 🛡️ Core Rules & Safety Invariants
+
+1. **Applicability Constraint**: 
+   - **USE ONLY** for modifying existing `.md` or `.markdown` files.
+   - **DO NOT USE** for creating new files or editing non-Markdown formats (like code files or plain `.txt` files).
+2. **Sequential Edit Cycle**:
+   - Every mutation MUST follow the exact sequence: `inspect`/`search` -> `read` -> `dry-run` -> `commit`.
+3. **No Overwrite Bypasses**:
+   - **NEVER bypass a conflict** (such as `TARGET_CHANGED` or `DOCUMENT_CHANGED`) by doing a full-file rewrite. Re-read the target node to obtain the latest state and retry the merge.
+4. **Tool Preference**:
+   - **Prefer local CLI** (`npx mdse`) for edits. MCP tools are also supported when available.
+5. **Version Check**:
+   - Run the helper script `.agents/skills/md-safeedit/scripts/md-safeedit check` to ensure compatibility.
 
 ---
 
-## ⚡ Core Workflow
-
-When asked to inspect, find, or modify any Markdown file, follow this structured, node-level edit cycle:
+## ⚡ Core Workflow Summary
 
 ```text
 Inspect / Search (Locate Target ID)
@@ -20,68 +32,42 @@ Read (Acquire Content & Signed Anchor Token)
        ↓
 Edit (Compute replacement locally)
        ↓
-Patch (Apply mutation atomically)
+Dry-run Patch (Verify preview diff)
+       ↓
+Commit Patch (Apply mutation to disk)
 ```
 
-### 1. Locate the Target
-First, do not read the entire file. Use the local CLI tool to get the document structure or search for content:
-
+### 1. Version Compatibility Check
+Before starting any edit, check version compatibility:
 ```bash
-# Get the outline structure and section headers
-npx -y @md-safeedit/cli@dev inspect path/to/document.md
-
-# Search for specific sections, list items, or tables
-npx -y @md-safeedit/cli@dev search path/to/document.md "your query"
+node .agents/skills/md-safeedit/scripts/md-safeedit check
 ```
 
-Find the `runtime_id` of the logical node (e.g., `section:Installation` or `table_row:3`) you wish to read or modify.
-
-### 2. Read the Node and Acquire Token
-Read the target node's content and acquire the cryptographically signed `anchor_token` representing that exact state:
-
+### 2. Locate and Read
+Find the node `runtime_id` and acquire the signed `anchor_token`:
 ```bash
-npx -y @md-safeedit/cli@dev read path/to/document.md "list_item:5"
+# Outline structure
+npx mdse inspect path/to/document.md --json
+
+# Read node content & token
+npx mdse read path/to/document.md "section_runtime_id" --json
 ```
-*Output is JSON. Extract the `content` and the `anchor.token` string.*
 
-### 3. Reason & Modify
-Edit the content locally in memory.
-
-### 4. Patch (Preview & Commit)
-Apply the patch using the token. By default, `patch` performs a **dry run** (preview diff). Add `--commit` to actually write the change:
-
+### 3. Dry-run and Commit
+Apply the replacement. The patch defaults to dry-run (preview). Add `--commit` to write to disk:
 ```bash
-# Preview the patch (Dry Run)
-npx -y @md-safeedit/cli@dev patch path/to/document.md replace "anchor_token_here" "New content block"
+# Dry-run patch (Preview)
+npx mdse patch path/to/document.md replace "anchor_token_here" "New content" --json
 
-# Commit the patch to disk
-npx -y @md-safeedit/cli@dev patch path/to/document.md replace "anchor_token_here" "New content block" --commit
+# Commit patch
+npx mdse patch path/to/document.md replace "anchor_token_here" "New content" --commit --json
 ```
-
----
-
-## 🛡️ Error Handling & Conflict Recovery
-
-The CLI outputs machine-readable JSON and exits with specific status codes. Use them to recover dynamically:
-
-| Exit Code | Error Code | Root Cause | Agent Action |
-| :---: | :--- | :--- | :--- |
-| **0** | - | Success | Continue workflow. |
-| **2** | `TARGET_CHANGED` / `DOCUMENT_CHANGED` | File or target modified by someone else since read. | **Conflict recovery required.** Call `inspect`/`search` and `read` again to obtain the latest content/token, merge the edits, and retry. *See reference below.* |
-| **3** | `ANCHOR_EXPIRED` | Signed token expired (default TTL is 1 hour). | Call `read` again to fetch a fresh token, and retry the patch. |
-| **4** | `ANCHOR_INVALID` / `ANCHOR_AMBIGUOUS` | Token signature mismatch or multiple matching nodes found. | Relocation is ambiguous or token is corrupted. Stop and ask the user for clarification. |
-| **5** | `VALIDATION_FAILED` / `INVALID_REPLACEMENT` | Syntax validation failed or operations overlap. | Check replacement content structure or operation boundaries. |
-| **6** | `IO_ERROR` / `COMMIT_RACE` | File I/O issue or disk commit race. | Retry after a short delay or report write permissions issue. |
-
----
-
-## 🛠️ MCP Alternative
-
-If you are running in a host environment (like Cursor, Claude Desktop, or custom IDEs) where the `md-safeedit` MCP server is registered, you should **prefer calling the native MCP tools** (`inspect`, `search`, `read`, `patch`) instead of executing shell commands. The logical workflow remains identical.
 
 ---
 
 ## 📖 Progressive Disclosure References
 
-For deep dives and troubleshooting templates:
-* **Conflict Resolution**: Read [.agents/skills/md-safeedit/references/conflict-resolution.md](file:///.agents/skills/md-safeedit/references/conflict-resolution.md) to learn how to merge concurrent changes when encountering exit code `2`.
+For deep dives and exact commands, read the reference files:
+* **Workflow Guide**: [workflow.md](file:///.agents/skills/md-safeedit/references/workflow.md)
+* **Error Recovery & Bypasses**: [error-recovery.md](file:///.agents/skills/md-safeedit/references/error-recovery.md)
+* **Supported Markdown & Targets**: [supported-markdown.md](file:///.agents/skills/md-safeedit/references/supported-markdown.md)

@@ -24,7 +24,10 @@ describe('CLI Shell Execution and Exit Codes', () => {
 
   const runCli = (args: string[], stdinContent?: string): { status: number | null; stdout: string; stderr: string } => {
     try {
-      const stdout = execSync(`node ${cliPath} ${args.join(' ')}`, {
+      const hasJsonFlags = args.includes('--json') || args.includes('--no-json');
+      const finalArgs = hasJsonFlags ? args : [...args, '--json'];
+      const cleanArgs = finalArgs.filter(a => a !== '--no-json');
+      const stdout = execSync(`node ${cliPath} ${cleanArgs.join(' ')}`, {
         input: stdinContent,
         encoding: 'utf-8',
         stdio: ['pipe', 'pipe', 'pipe'],
@@ -94,5 +97,24 @@ describe('CLI Shell Execution and Exit Codes', () => {
     const parsed = JSON.parse(res.stdout);
     expect(parsed.ok).toBe(false);
     expect(parsed.error.code).toBe('VALIDATION_FAILED');
+  });
+
+  it('verifies human-readable text output mode when --json is omitted', () => {
+    const res = runCli(['inspect', filePath, '--no-json']);
+    expect(res.status).toBe(0);
+    expect(res.stdout).toContain('mdse CLI version:');
+    expect(res.stdout).toContain('File:');
+    expect(res.stdout).toContain('Outline:');
+    expect(res.stdout).not.toContain('{'); // not JSON
+  });
+
+  it('verifies --version and -v queries', () => {
+    const resVer = runCli(['--version']);
+    const parsedVer = JSON.parse(resVer.stdout);
+    expect(parsedVer.ok).toBe(true);
+    expect(parsedVer.cli_version).toBeDefined();
+
+    const resVerNoJson = runCli(['-v', '--no-json']);
+    expect(resVerNoJson.stdout).toContain('mdse CLI version:');
   });
 });

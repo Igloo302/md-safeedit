@@ -69,7 +69,7 @@ async function run() {
     
     // Inspect
     console.log('   Running: mdse inspect');
-    const inspectOut = execSync(`npx mdse inspect "${sampleMd}"`, { cwd: tempDir, ...SHELL_OPT }).toString();
+    const inspectOut = execSync(`npx mdse inspect "${sampleMd}" --json`, { cwd: tempDir, ...SHELL_OPT }).toString();
     const inspectJson = JSON.parse(inspectOut);
     if (!inspectJson.ok || !inspectJson.document) {
       throw new Error(`CLI inspect output validation failed: ${inspectOut}`);
@@ -78,7 +78,7 @@ async function run() {
 
     // Search
     console.log('   Running: mdse search');
-    const searchOut = execSync(`npx mdse search "${sampleMd}" "paragraph"`, { cwd: tempDir, ...SHELL_OPT }).toString();
+    const searchOut = execSync(`npx mdse search "${sampleMd}" "paragraph" --json`, { cwd: tempDir, ...SHELL_OPT }).toString();
     const searchJson = JSON.parse(searchOut);
     if (!searchJson.ok || !Array.isArray(searchJson.matches)) {
       throw new Error(`CLI search output validation failed: ${searchOut}`);

@@ -1,0 +1,89 @@
+#!/usr/bin/env node
+
+import { execSync } from 'child_process';
+import * as fs from 'fs';
+import * as path from 'path';
+
+// Expected version info
+const EXPECTED_PROTOCOL = '1.0';
+
+function getCLIVersion() {
+  const tryCommands = [
+    'node packages/cli/dist/index.js --version --json',
+    'npx mdse --version --json'
+  ];
+
+  for (const cmd of tryCommands) {
+    try {
+      const out = execSync(cmd, { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'pipe'] });
+      const parsed = JSON.parse(out);
+      if (parsed.cli_version) {
+        return {
+          cliVersion: parsed.cli_version,
+          protocolVersion: parsed.protocol_version
+        };
+      }
+    } catch (e) {
+      // try next
+    }
+  }
+
+  // Fallback to text version check if JSON fails
+  const tryTextCommands = [
+    'node packages/cli/dist/index.js -v',
+    'npx mdse -v'
+  ];
+  for (const cmd of tryTextCommands) {
+    try {
+      const out = execSync(cmd, { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'pipe'] });
+      const cliMatch = out.match(/mdse CLI version:\s*([^\n]+)/);
+      const protoMatch = out.match(/Protocol version:\s*([^\n]+)/);
+      if (cliMatch) {
+        return {
+          cliVersion: cliMatch[1].trim(),
+          protocolVersion: protoMatch ? protoMatch[1].trim() : null
+        };
+      }
+    } catch (e) {
+      // try next
+    }
+  }
+
+  return null;
+}
+
+function main() {
+  const args = process.argv.slice(2);
+  const command = args[0];
+
+  if (command === 'check') {
+    console.log('🔍 Checking environment and version compatibility...');
+    const versions = getCLIVersion();
+    if (!versions || !versions.cliVersion) {
+      console.error('❌ Error: mdse CLI is not installed or not in PATH.');
+      console.error('   Please run: npm run build');
+      process.exit(1);
+    }
+
+    console.log(`✅ CLI version: ${versions.cliVersion}`);
+    console.log(`✅ Protocol version: ${versions.protocolVersion}`);
+
+    if (versions.protocolVersion !== EXPECTED_PROTOCOL) {
+      console.warn(`⚠️ Warning: Protocol version mismatch. Expected "${EXPECTED_PROTOCOL}", got "${versions.protocolVersion}".`);
+    } else {
+      console.log('✅ Version compatibility check passed successfully.');
+    }
+    process.exit(0);
+  }
+
+  // Help / Usage info
+  console.log('MD SafeEdit Skill Helper Script');
+  console.log('Usage:');
+  console.log('  node scripts/md-safeedit check                          - Run compatibility check');
+  console.log('  node scripts/md-safeedit inspect <file>                 - Safe inspect');
+  console.log('  node scripts/md-safeedit search <file> <q>              - Safe search');
+  console.log('  node scripts/md-safeedit read <file> <id>               - Safe read');
+  console.log('  node scripts/md-safeedit patch <file> <op> <tok> [val]  - Safe patch (dry-run)');
+}
+
+main();
