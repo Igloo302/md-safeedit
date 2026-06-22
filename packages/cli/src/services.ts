@@ -1,31 +1,33 @@
-import * as fs from 'fs';
-import * as path from 'path';
-import * as crypto from 'crypto';
-import { fileURLToPath } from 'url';
-import { 
-  createSnapshot, 
-  applyEdits, 
-  atomicWriteFile, 
+import * as fs from "fs";
+import * as path from "path";
+import * as crypto from "crypto";
+import { fileURLToPath } from "url";
+import {
+  createSnapshot,
+  applyEdits,
+  atomicWriteFile,
   generateUnifiedDiff,
-  ByteEdit
-} from '@md-safeedit/core';
-import { 
-  parseMarkdownToNodes, 
-  buildLogicalSections, 
+  ByteEdit,
+} from "@md-safeedit/core";
+import {
+  parseMarkdownToNodes,
+  buildLogicalSections,
   MarkdownNode,
   relocateNode,
   getPathFingerprint,
-  explainRelocationFailure
-} from '@md-safeedit/markdown';
-import { 
-  verifyToken, 
-  createToken, 
+  explainRelocationFailure,
+} from "@md-safeedit/markdown";
+import {
+  verifyToken,
+  createToken,
   AnchorPayloadV1,
   InspectRequest,
   SearchRequest,
   ReadRequest,
-  PatchRequest
-} from '@md-safeedit/protocol';
+  PatchRequest,
+  SafeReplaceRequest,
+  SafePatchRequest,
+} from "@md-safeedit/protocol";
 
 export interface ServiceError {
   code: string;
@@ -35,65 +37,86 @@ export interface ServiceError {
   details?: any;
 }
 
-export function formatError(code: string, message: string, details?: any): { ok: false; error: ServiceError } {
+export function formatError(
+  code: string,
+  message: string,
+  details?: any,
+): { ok: false; error: ServiceError } {
   let retryable = false;
-  let recommended_action = '';
+  let recommended_action = "";
 
   switch (code) {
-    case 'DOCUMENT_CHANGED':
+    case "DOCUMENT_CHANGED":
       retryable = true;
-      recommended_action = 'The document has changed. Re-inspect or use the node-level retry flow.';
+      recommended_action =
+        "The document has changed. Re-inspect or use the node-level retry flow.";
       break;
-    case 'TARGET_CHANGED':
+    case "TARGET_CHANGED":
       retryable = true;
-      recommended_action = 'The target content changed after it was read. Read the candidate again and create a new patch.';
+      recommended_action =
+        "The target content changed after it was read. Read the candidate again and create a new patch.";
       break;
-    case 'TARGET_MISSING':
+    case "TARGET_MISSING":
       retryable = false;
-      recommended_action = 'The target could not be found. Search again or check the path.';
+      recommended_action =
+        "The target could not be found. Search again or check the path.";
       break;
-    case 'ANCHOR_AMBIGUOUS':
+    case "ANCHOR_AMBIGUOUS":
       retryable = false;
-      recommended_action = 'Multiple identical candidates found. Refine your query or select a more specific section.';
+      recommended_action =
+        "Multiple identical candidates found. Refine your query or select a more specific section.";
       break;
-    case 'ANCHOR_INSUFFICIENT_EVIDENCE':
+    case "ANCHOR_INSUFFICIENT_EVIDENCE":
       retryable = false;
-      recommended_action = 'The anchor has insufficient structural evidence to authorize relocation. Re-read the node and generate a new token.';
+      recommended_action =
+        "The anchor has insufficient structural evidence to authorize relocation. Re-read the node and generate a new token.";
       break;
-    case 'ANCHOR_INVALID':
+    case "ANCHOR_INVALID":
       retryable = false;
-      recommended_action = 'The anchor token is invalid, forged, or incompatible. Obtain a new anchor.';
+      recommended_action =
+        "The anchor token is invalid, forged, or incompatible. Obtain a new anchor.";
       break;
-    case 'ANCHOR_EXPIRED':
+    case "ANCHOR_EXPIRED":
       retryable = true;
-      recommended_action = 'The anchor token has expired. Read the node again to get a fresh anchor.';
+      recommended_action =
+        "The anchor token has expired. Read the node again to get a fresh anchor.";
       break;
-    case 'OVERLAPPING_OPERATIONS':
+    case "OVERLAPPING_OPERATIONS":
       retryable = false;
-      recommended_action = 'Operations in this transaction intersect or overlap. Split them or edit different ranges.';
+      recommended_action =
+        "Operations in this transaction intersect or overlap. Split them or edit different ranges.";
       break;
-    case 'UNSUPPORTED_SYNTAX':
+    case "UNSUPPORTED_SYNTAX":
       retryable = false;
-      recommended_action = 'Safe node boundary is unavailable. Use a larger supported node.';
+      recommended_action =
+        "Safe node boundary is unavailable. Use a larger supported node.";
       break;
-    case 'INVALID_REPLACEMENT':
+    case "INVALID_REPLACEMENT":
       retryable = false;
-      recommended_action = 'The replacement content violates node formatting rules or is invalid.';
+      recommended_action =
+        "The replacement content violates node formatting rules or is invalid.";
       break;
-    case 'VALIDATION_FAILED':
+    case "VALIDATION_FAILED":
       retryable = false;
-      recommended_action = 'Request validation failed. Hint: Check your arguments. Run "mdse --help" to see command usage guidelines.';
+      recommended_action =
+        'Request validation failed. Hint: Check your arguments. Run "mdse --help" to see command usage guidelines.';
       break;
-    case 'COMMIT_RACE':
+    case "COMMIT_RACE":
       retryable = true;
-      recommended_action = 'The file was modified concurrently during commit. Retry the entire transaction.';
+      recommended_action =
+        "The file was modified concurrently during commit. Retry the entire transaction.";
       break;
-    case 'IO_ERROR':
+    case "IO_ERROR":
       retryable = true;
-      if (message.includes('ENOENT') || message.toLowerCase().includes('no such file')) {
-        recommended_action = 'File not found. Hint: Check if the file path is correct. You can run "mdse inspect <filePath>" to verify.';
+      if (
+        message.includes("ENOENT") ||
+        message.toLowerCase().includes("no such file")
+      ) {
+        recommended_action =
+          'File not found. Hint: Check if the file path is correct. You can run "mdse inspect <filePath>" to verify.';
       } else {
-        recommended_action = 'A filesystem IO error occurred. Inspect system permissions or retry.';
+        recommended_action =
+          "A filesystem IO error occurred. Inspect system permissions or retry.";
       }
       break;
     default:
@@ -108,60 +131,74 @@ export function formatError(code: string, message: string, details?: any): { ok:
       message,
       retryable,
       recommended_action,
-      details
-    }
+      details,
+    },
   };
 }
 
 /**
  * Service: inspect
  */
-export function inspectService(request: InspectRequest, allowedRoots: string[]) {
+export function inspectService(
+  request: InspectRequest,
+  allowedRoots: string[],
+) {
   try {
     const snapshot = createSnapshot(request.file.path, allowedRoots);
     const parsed = parseMarkdownToNodes(snapshot.bytes, snapshot.content);
-    const nodes = buildLogicalSections(parsed, snapshot.bytes, snapshot.content);
+    const nodes = buildLogicalSections(
+      parsed,
+      snapshot.bytes,
+      snapshot.content,
+    );
 
     const outline = nodes
-      .filter(n => n.type === 'section')
-      .map(n => {
+      .filter((n) => n.type === "section")
+      .map((n) => {
         // Find heading child to get its title
-        const headingChild = nodes.find(c => c.parentRuntimeId === n.runtimeId && c.type === 'heading');
-        const title = headingChild ? headingChild.content.replace(/^#+\s+/, '').replace(/\s+#+$/, '').trim() : 'Document';
+        const headingChild = nodes.find(
+          (c) => c.parentRuntimeId === n.runtimeId && c.type === "heading",
+        );
+        const title = headingChild
+          ? headingChild.content
+              .replace(/^#+\s+/, "")
+              .replace(/\s+#+$/, "")
+              .trim()
+          : "Document";
         const headingLevel = headingChild ? headingChild.level || 1 : 1;
-        
+
         return {
           runtime_id: n.runtimeId,
-          type: 'section',
+          type: "section",
           title,
           level: headingLevel,
-          path: n.structuralPath.map(s => ({
+          path: n.structuralPath.map((s) => ({
             heading: s.heading,
             level: s.level,
-            occurrence: s.occurrence
+            occurrence: s.occurrence,
           })),
-          child_count: n.childRuntimeIds.length - 1 // Exclude heading child
+          child_count: n.childRuntimeIds.length - 1, // Exclude heading child
         };
       });
 
     return {
       ok: true,
-      protocol_version: '1.0',
+      protocol_version: "1.0",
       document: {
         display_path: request.file.path,
         revision: snapshot.revision,
-        dialect: 'commonmark+gfm',
+        dialect: "commonmark+gfm",
         size_bytes: snapshot.bytes.length,
-        line_ending: snapshot.lineEnding
+        line_ending: snapshot.lineEnding,
       },
       outline,
-      warnings: []
+      warnings: [],
     };
   } catch (err: any) {
-    if (err.message.startsWith('Access Denied')) {
-      return formatError('IO_ERROR', err.message);
+    if (err.message.startsWith("Access Denied")) {
+      return formatError("IO_ERROR", err.message);
     }
-    return formatError('IO_ERROR', err.message || 'Failed to inspect file.');
+    return formatError("IO_ERROR", err.message || "Failed to inspect file.");
   }
 }
 
@@ -172,22 +209,30 @@ export function searchService(request: SearchRequest, allowedRoots: string[]) {
   try {
     const snapshot = createSnapshot(request.file.path, allowedRoots);
     const parsed = parseMarkdownToNodes(snapshot.bytes, snapshot.content);
-    const nodes = buildLogicalSections(parsed, snapshot.bytes, snapshot.content);
+    const nodes = buildLogicalSections(
+      parsed,
+      snapshot.bytes,
+      snapshot.content,
+    );
 
     let filtered = nodes;
 
     // Filter by type
     if (request.filters?.include_types) {
-      filtered = filtered.filter(n => request.filters!.include_types!.includes(n.type));
+      filtered = filtered.filter((n) =>
+        request.filters!.include_types!.includes(n.type),
+      );
     }
     if (request.filters?.exclude_types) {
-      filtered = filtered.filter(n => !request.filters!.exclude_types!.includes(n.type));
+      filtered = filtered.filter(
+        (n) => !request.filters!.exclude_types!.includes(n.type),
+      );
     }
 
     // Filter by heading path (under_path)
     if (request.filters?.under_path && request.filters.under_path.length > 0) {
       const up = request.filters.under_path;
-      filtered = filtered.filter(n => {
+      filtered = filtered.filter((n) => {
         if (n.structuralPath.length < up.length) return false;
         for (let i = 0; i < up.length; i++) {
           if (
@@ -205,18 +250,23 @@ export function searchService(request: SearchRequest, allowedRoots: string[]) {
     // Text query match (case-insensitive)
     const query = request.query.toLowerCase();
     const matches = filtered
-      .map(n => {
+      .map((n) => {
         const contentLower = n.content.toLowerCase();
         const matchIdx = contentLower.indexOf(query);
         if (matchIdx === -1) return null;
 
-        const halfWindow = Math.floor((request.options?.preview_chars || 160) / 2);
+        const halfWindow = Math.floor(
+          (request.options?.preview_chars || 160) / 2,
+        );
         // Build a match-centred preview so match_ranges always fall within the preview string
         const previewStart = Math.max(0, matchIdx - halfWindow);
-        const previewEnd = Math.min(n.content.length, matchIdx + query.length + halfWindow);
+        const previewEnd = Math.min(
+          n.content.length,
+          matchIdx + query.length + halfWindow,
+        );
         const rawPreview = n.content.slice(previewStart, previewEnd);
-        const prefix = previewStart > 0 ? '...' : '';
-        const suffix = previewEnd < n.content.length ? '...' : '';
+        const prefix = previewStart > 0 ? "..." : "";
+        const suffix = previewEnd < n.content.length ? "..." : "";
         const preview = prefix + rawPreview + suffix;
         // match_ranges are relative to the preview string
         const previewMatchStart = prefix.length + (matchIdx - previewStart);
@@ -225,16 +275,18 @@ export function searchService(request: SearchRequest, allowedRoots: string[]) {
         return {
           runtime_id: n.runtimeId,
           type: n.type,
-          path: n.structuralPath.map(s => ({
+          path: n.structuralPath.map((s) => ({
             heading: s.heading,
             level: s.level,
-            occurrence: s.occurrence
+            occurrence: s.occurrence,
           })),
           preview,
-          match_ranges: [{
-            start: previewMatchStart,
-            end: previewMatchEnd
-          }]
+          match_ranges: [
+            {
+              start: previewMatchStart,
+              end: previewMatchEnd,
+            },
+          ],
         };
       })
       .filter((m): m is NonNullable<typeof m> => m !== null);
@@ -244,10 +296,10 @@ export function searchService(request: SearchRequest, allowedRoots: string[]) {
     return {
       ok: true,
       document_revision: snapshot.revision,
-      matches: matches.slice(0, limit)
+      matches: matches.slice(0, limit),
     };
   } catch (err: any) {
-    return formatError('IO_ERROR', err.message || 'Failed to search file.');
+    return formatError("IO_ERROR", err.message || "Failed to search file.");
   }
 }
 
@@ -258,14 +310,21 @@ export function readService(request: ReadRequest, allowedRoots: string[]) {
   try {
     const snapshot = createSnapshot(request.file.path, allowedRoots);
     const parsed = parseMarkdownToNodes(snapshot.bytes, snapshot.content);
-    const nodes = buildLogicalSections(parsed, snapshot.bytes, snapshot.content);
+    const nodes = buildLogicalSections(
+      parsed,
+      snapshot.bytes,
+      snapshot.content,
+    );
 
     const matchedNodes: any[] = [];
 
     for (const target of request.targets) {
-      const node = nodes.find(n => n.runtimeId === target.runtime_id);
+      const node = nodes.find((n) => n.runtimeId === target.runtime_id);
       if (!node) {
-        return formatError('TARGET_MISSING', `Target node with runtime_id "${target.runtime_id}" not found.`);
+        return formatError(
+          "TARGET_MISSING",
+          `Target node with runtime_id "${target.runtime_id}" not found.`,
+        );
       }
 
       // Collect siblings for neighbors
@@ -273,28 +332,34 @@ export function readService(request: ReadRequest, allowedRoots: string[]) {
       let next: any[] = [];
 
       if (node.parentRuntimeId) {
-        const parentNode = nodes.find(n => n.runtimeId === node.parentRuntimeId);
+        const parentNode = nodes.find(
+          (n) => n.runtimeId === node.parentRuntimeId,
+        );
         if (parentNode) {
           const siblingIds = parentNode.childRuntimeIds;
           const idx = siblingIds.indexOf(node.runtimeId);
-          
+
           const limit = request.options?.include_neighbors || 0;
           for (let i = 1; i <= limit; i++) {
             if (idx - i >= 0) {
-              const prevNode = nodes.find(n => n.runtimeId === siblingIds[idx - i]);
+              const prevNode = nodes.find(
+                (n) => n.runtimeId === siblingIds[idx - i],
+              );
               if (prevNode) {
                 previous.push({
                   type: prevNode.type,
-                  content: prevNode.content
+                  content: prevNode.content,
                 });
               }
             }
             if (idx + i < siblingIds.length) {
-              const nextNode = nodes.find(n => n.runtimeId === siblingIds[idx + i]);
+              const nextNode = nodes.find(
+                (n) => n.runtimeId === siblingIds[idx + i],
+              );
               if (nextNode) {
                 next.push({
                   type: nextNode.type,
-                  content: nextNode.content
+                  content: nextNode.content,
                 });
               }
             }
@@ -304,31 +369,37 @@ export function readService(request: ReadRequest, allowedRoots: string[]) {
 
       // Generate structuralEvidence
       const pathFingerprint = getPathFingerprint(node.structuralPath);
-      
+
       let parentFingerprint: string | undefined;
       let previousFingerprint: string | undefined;
       let nextFingerprint: string | undefined;
       let siblingOccurrence: number | undefined;
 
       if (node.parentRuntimeId) {
-        const parentNode = nodes.find(n => n.runtimeId === node.parentRuntimeId);
+        const parentNode = nodes.find(
+          (n) => n.runtimeId === node.parentRuntimeId,
+        );
         if (parentNode) {
           parentFingerprint = parentNode.rawHash;
 
           const siblingIds = parentNode.childRuntimeIds;
           const idx = siblingIds.indexOf(node.runtimeId);
           if (idx - 1 >= 0) {
-            const prevNode = nodes.find(n => n.runtimeId === siblingIds[idx - 1]);
+            const prevNode = nodes.find(
+              (n) => n.runtimeId === siblingIds[idx - 1],
+            );
             if (prevNode) previousFingerprint = prevNode.rawHash;
           }
           if (idx + 1 < siblingIds.length) {
-            const nextNode = nodes.find(n => n.runtimeId === siblingIds[idx + 1]);
+            const nextNode = nodes.find(
+              (n) => n.runtimeId === siblingIds[idx + 1],
+            );
             if (nextNode) nextFingerprint = nextNode.rawHash;
           }
 
           let occurrenceCount = 1;
           for (let i = 0; i < idx; i++) {
-            const sibling = nodes.find(n => n.runtimeId === siblingIds[i]);
+            const sibling = nodes.find((n) => n.runtimeId === siblingIds[i]);
             if (sibling && sibling.type === node.type) {
               occurrenceCount++;
             }
@@ -345,10 +416,10 @@ export function readService(request: ReadRequest, allowedRoots: string[]) {
         range: node.range,
         rawHash: node.rawHash,
         nodeType: node.type,
-        structuralPath: node.structuralPath.map(s => ({
+        structuralPath: node.structuralPath.map((s) => ({
           heading: s.heading,
           level: s.level,
-          occurrence: s.occurrence
+          occurrence: s.occurrence,
         })),
         structuralEvidence: {
           pathFingerprint,
@@ -356,12 +427,15 @@ export function readService(request: ReadRequest, allowedRoots: string[]) {
           previousFingerprint,
           nextFingerprint,
           siblingOccurrence,
-          blockId: node.blockId
+          blockId: node.blockId,
         },
         blockId: node.blockId,
-        dialect: 'commonmark+gfm',
+        dialect: "commonmark+gfm",
         issuedAt: Date.now(),
-        expiresAt: Date.now() + (parseInt(process.env.MDSE_TOKEN_TTL_MS ?? '86400000', 10) || 86400000) // default 24 hours, configurable via MDSE_TOKEN_TTL_MS
+        expiresAt:
+          Date.now() +
+          (parseInt(process.env.MDSE_TOKEN_TTL_MS ?? "86400000", 10) ||
+            86400000), // default 24 hours, configurable via MDSE_TOKEN_TTL_MS
       };
 
       const token = createToken(payload);
@@ -369,29 +443,29 @@ export function readService(request: ReadRequest, allowedRoots: string[]) {
       matchedNodes.push({
         type: node.type,
         content: node.content,
-        path: node.structuralPath.map(s => ({
+        path: node.structuralPath.map((s) => ({
           heading: s.heading,
           level: s.level,
-          occurrence: s.occurrence
+          occurrence: s.occurrence,
         })),
         anchor_token: token,
         neighbors: {
           previous,
-          next
-        }
+          next,
+        },
       });
     }
 
     return {
       ok: true,
       document_revision: snapshot.revision,
-      nodes: matchedNodes
+      nodes: matchedNodes,
     };
   } catch (err: any) {
-    if (err.message.startsWith('Target node')) {
-      return formatError('TARGET_MISSING', err.message);
+    if (err.message.startsWith("Target node")) {
+      return formatError("TARGET_MISSING", err.message);
     }
-    return formatError('IO_ERROR', err.message || 'Failed to read file.');
+    return formatError("IO_ERROR", err.message || "Failed to read file.");
   }
 }
 
@@ -400,23 +474,26 @@ function isSwallowed(originalNum: string, replacement: string): boolean {
     const suffix = originalNum.slice(i);
     let idx = -1;
     while ((idx = replacement.indexOf(suffix, idx + 1)) !== -1) {
-      const charBefore = idx > 0 ? replacement[idx - 1] : '';
-      const charAfter = idx + suffix.length < replacement.length ? replacement[idx + suffix.length] : '';
-      
+      const charBefore = idx > 0 ? replacement[idx - 1] : "";
+      const charAfter =
+        idx + suffix.length < replacement.length
+          ? replacement[idx + suffix.length]
+          : "";
+
       const isPrecededByDigit = /[0-9]/.test(charBefore);
       const isFollowedByDigit = /[0-9]/.test(charAfter);
-      
+
       if (isPrecededByDigit || isFollowedByDigit) {
         let start = idx;
         while (start > 0 && /[0-9]/.test(replacement[start - 1])) {
           start--;
         }
-        const hasDollar = start > 0 && replacement[start - 1] === '$';
+        const hasDollar = start > 0 && replacement[start - 1] === "$";
         if (!hasDollar) {
           return true;
         }
       } else {
-        if (charBefore !== '$') {
+        if (charBefore !== "$") {
           return true;
         }
       }
@@ -441,20 +518,30 @@ export function patchService(request: PatchRequest, allowedRoots: string[]) {
     // Verify all operations first
     for (let i = 0; i < request.operations.length; i++) {
       const op = request.operations[i];
-      
+
       let payload: AnchorPayloadV1;
       try {
         payload = verifyToken(op.anchor_token);
       } catch (err: any) {
-        if (err.message === 'ANCHOR_EXPIRED') {
-          return formatError('ANCHOR_EXPIRED', 'Anchor token has expired.', { operation_index: i });
+        if (err.message === "ANCHOR_EXPIRED") {
+          return formatError("ANCHOR_EXPIRED", "Anchor token has expired.", {
+            operation_index: i,
+          });
         }
-        return formatError('ANCHOR_INVALID', 'Anchor token is invalid or has been modified.', { operation_index: i });
+        return formatError(
+          "ANCHOR_INVALID",
+          "Anchor token is invalid or has been modified.",
+          { operation_index: i },
+        );
       }
 
       // Ensure path matches
       if (payload.fileKey !== snapshot.canonicalPath) {
-        return formatError('ANCHOR_INVALID', 'Anchor token does not belong to the target file.', { operation_index: i });
+        return formatError(
+          "ANCHOR_INVALID",
+          "Anchor token does not belong to the target file.",
+          { operation_index: i },
+        );
       }
 
       let startOffset = payload.range.start;
@@ -464,28 +551,52 @@ export function patchService(request: PatchRequest, allowedRoots: string[]) {
       // Revision check and relocation
       if (payload.sourceRevision !== snapshot.revision) {
         const parsed = parseMarkdownToNodes(snapshot.bytes, snapshot.content);
-        const nodes = buildLogicalSections(parsed, snapshot.bytes, snapshot.content);
-        
+        const nodes = buildLogicalSections(
+          parsed,
+          snapshot.bytes,
+          snapshot.content,
+        );
+
         const relocated = relocateNode(payload, nodes, snapshot.bytes.length);
         if (!relocated) {
-          const sameTypeNodes = nodes.filter(n => n.type === payload.nodeType);
-          const candidates = sameTypeNodes.filter(n => n.rawHash === payload.rawHash);
+          const sameTypeNodes = nodes.filter(
+            (n) => n.type === payload.nodeType,
+          );
+          const candidates = sameTypeNodes.filter(
+            (n) => n.rawHash === payload.rawHash,
+          );
 
           if (candidates.length === 0) {
             const pathFP = payload.structuralEvidence?.pathFingerprint;
-            const changedNode = sameTypeNodes.find(n => getPathFingerprint(n.structuralPath) === pathFP);
+            const changedNode = sameTypeNodes.find(
+              (n) => getPathFingerprint(n.structuralPath) === pathFP,
+            );
             if (changedNode) {
-              return formatError('TARGET_CHANGED', 'Target content has been modified.', { operation_index: i });
+              return formatError(
+                "TARGET_CHANGED",
+                "Target content has been modified.",
+                { operation_index: i },
+              );
             }
-            return formatError('TARGET_MISSING', 'Target node could not be found.', { operation_index: i });
+            return formatError(
+              "TARGET_MISSING",
+              "Target node could not be found.",
+              { operation_index: i },
+            );
           } else {
-            const failureCode = explainRelocationFailure(payload, candidates, nodes, snapshot.bytes.length);
-            const message = failureCode === 'ANCHOR_AMBIGUOUS'
-              ? 'Multiple candidates match the target description. Relocation is ambiguous.'
-              : 'The anchor has insufficient structural evidence to authorize relocation.';
-            return formatError(failureCode, message, { 
+            const failureCode = explainRelocationFailure(
+              payload,
+              candidates,
+              nodes,
+              snapshot.bytes.length,
+            );
+            const message =
+              failureCode === "ANCHOR_AMBIGUOUS"
+                ? "Multiple candidates match the target description. Relocation is ambiguous."
+                : "The anchor has insufficient structural evidence to authorize relocation.";
+            return formatError(failureCode, message, {
               operation_index: i,
-              candidate_count: candidates.length
+              candidate_count: candidates.length,
             });
           }
         } else {
@@ -497,19 +608,27 @@ export function patchService(request: PatchRequest, allowedRoots: string[]) {
       } else {
         // Fast-path byte-exact validation
         if (!payload.range) {
-          return formatError('ANCHOR_INVALID', 'Anchor token is missing range info.', { operation_index: i });
+          return formatError(
+            "ANCHOR_INVALID",
+            "Anchor token is missing range info.",
+            { operation_index: i },
+          );
         }
 
         const currentBytes = snapshot.bytes.subarray(startOffset, endOffset);
-        const currentHash = `sha256:${crypto.createHash('sha256').update(currentBytes).digest('hex')}`;
+        const currentHash = `sha256:${crypto.createHash("sha256").update(currentBytes).digest("hex")}`;
 
         if (currentHash !== payload.rawHash) {
-          return formatError('TARGET_CHANGED', 'Target content has been modified.', { operation_index: i });
+          return formatError(
+            "TARGET_CHANGED",
+            "Target content has been modified.",
+            { operation_index: i },
+          );
         }
       }
 
       // Heuristic check for swallowed dollar signs
-      if (op.op === 'replace') {
+      if (op.op === "replace") {
         const currentBytes = snapshot.bytes.subarray(startOffset, endOffset);
         const originalText = new TextDecoder().decode(currentBytes);
         const dollarRegex = /\$([0-9]+)/g;
@@ -517,7 +636,9 @@ export function patchService(request: PatchRequest, allowedRoots: string[]) {
         while ((match = dollarRegex.exec(originalText)) !== null) {
           const num = match[1];
           if (isSwallowed(num, op.content)) {
-            warnings.push(`Potential swallowed '$' symbol detected. Original node contained '$${num}' but replacement has it missing or modified. Hint: Escape '$' as '\\$' or use '@filePath' to load content from a file.`);
+            warnings.push(
+              `Potential swallowed '$' symbol detected. Original node contained '$${num}' but replacement has it missing or modified. Hint: Escape '$' as '\\$' or use '@filePath' to load content from a file.`,
+            );
             break; // only warn once
           }
         }
@@ -529,22 +650,27 @@ export function patchService(request: PatchRequest, allowedRoots: string[]) {
       let editLength = endOffset - startOffset;
 
       // Determine the document's line ending sequence for insert operations
-      const lineEnding = snapshot.lineEnding === 'crlf' ? '\r\n' : '\n';
+      const lineEnding = snapshot.lineEnding === "crlf" ? "\r\n" : "\n";
 
-      if (op.op === 'replace') {
+      if (op.op === "replace") {
         replacement = new TextEncoder().encode(op.content);
-      } else if (op.op === 'delete') {
+      } else if (op.op === "delete") {
         replacement = new Uint8Array(0);
-      } else if (op.op === 'insert_before') {
+      } else if (op.op === "insert_before") {
         // Ensure the inserted block-level content is separated from the existing node by a newline.
         // If the caller has already included a trailing newline we don't double-add one.
-        const insertContent = op.content.endsWith('\n') ? op.content : op.content + lineEnding;
+        const insertContent = op.content.endsWith("\n")
+          ? op.content
+          : op.content + lineEnding;
         replacement = new TextEncoder().encode(insertContent);
         editOffset = startOffset;
         editLength = 0;
-      } else { // insert_after
+      } else {
+        // insert_after
         // Ensure the inserted block-level content is separated from the existing node by a newline.
-        const insertContent = op.content.startsWith('\n') ? op.content : lineEnding + op.content;
+        const insertContent = op.content.startsWith("\n")
+          ? op.content
+          : lineEnding + op.content;
         replacement = new TextEncoder().encode(insertContent);
         editOffset = endOffset;
         editLength = 0;
@@ -554,13 +680,13 @@ export function patchService(request: PatchRequest, allowedRoots: string[]) {
         offset: editOffset,
         length: editLength,
         replacement,
-        index: i
+        index: i,
       });
 
       operationsSummary.push({
         index: i,
-        status: isRelocated ? 'verified_relocated' : 'verified',
-        node_type: payload.nodeType
+        status: isRelocated ? "verified_relocated" : "verified",
+        node_type: payload.nodeType,
       });
     }
 
@@ -569,69 +695,89 @@ export function patchService(request: PatchRequest, allowedRoots: string[]) {
     try {
       nextBytes = applyEdits(snapshot.bytes, byteEdits);
     } catch (err: any) {
-      if (err.message === 'OVERLAPPING_OPERATIONS') {
-        return formatError('OVERLAPPING_OPERATIONS', 'Patch operations overlap inside the transaction.');
+      if (err.message === "OVERLAPPING_OPERATIONS") {
+        return formatError(
+          "OVERLAPPING_OPERATIONS",
+          "Patch operations overlap inside the transaction.",
+        );
       }
-      return formatError('INVALID_REPLACEMENT', err.message);
+      return formatError("INVALID_REPLACEMENT", err.message);
     }
 
-    const nextContent = new TextDecoder('utf-8').decode(nextBytes);
+    const nextContent = new TextDecoder("utf-8").decode(nextBytes);
 
     // Validation level check
-    const validationLevel = request.options?.validation_level || 'normal';
-    if (validationLevel !== 'permissive') {
+    const validationLevel = request.options?.validation_level || "normal";
+    if (validationLevel !== "permissive") {
       try {
         // Parse the resulting markdown string to ensure it is structurally valid
         const nextNodes = parseMarkdownToNodes(nextBytes, nextContent);
         buildLogicalSections(nextNodes, nextBytes, nextContent);
       } catch (err: any) {
-        return formatError('VALIDATION_FAILED', `Resulting document is invalid: ${err.message}`);
+        return formatError(
+          "VALIDATION_FAILED",
+          `Resulting document is invalid: ${err.message}`,
+        );
       }
     }
 
     // Generate diff preview
-    const diff = generateUnifiedDiff(snapshot.content, nextContent, request.file.path);
+    const diff = generateUnifiedDiff(
+      snapshot.content,
+      nextContent,
+      request.file.path,
+    );
 
     if (request.options?.dry_run !== false) {
-      const resultHash = crypto.createHash('sha256').update(nextBytes).digest('hex');
+      const resultHash = crypto
+        .createHash("sha256")
+        .update(nextBytes)
+        .digest("hex");
       return {
         ok: true,
-        status: 'preview',
+        status: "preview",
         source_revision: snapshot.revision,
         result_revision: `sha256:${resultHash}`,
         relocated: anyRelocated,
         diff,
         operations: operationsSummary,
-        warnings: warnings
+        warnings: warnings,
       };
     }
 
     // Commit changes atomically
     let newRevision: string;
     try {
-      newRevision = atomicWriteFile(snapshot.canonicalPath, nextBytes, snapshot.revision);
+      newRevision = atomicWriteFile(
+        snapshot.canonicalPath,
+        nextBytes,
+        snapshot.revision,
+      );
     } catch (err: any) {
-      if (err.message === 'COMMIT_RACE') {
-        return formatError('COMMIT_RACE', 'File changed during final commit window.');
+      if (err.message === "COMMIT_RACE") {
+        return formatError(
+          "COMMIT_RACE",
+          "File changed during final commit window.",
+        );
       }
-      return formatError('IO_ERROR', err.message || 'Atomic write failed.');
+      return formatError("IO_ERROR", err.message || "Atomic write failed.");
     }
 
     return {
       ok: true,
-      status: 'committed',
+      status: "committed",
       source_revision: snapshot.revision,
       new_revision: newRevision,
       relocated: anyRelocated,
       diff,
       operations: operationsSummary,
-      warnings: warnings
+      warnings: warnings,
     };
   } catch (err: any) {
-    if (err.message === 'COMMIT_RACE') {
-      return formatError('COMMIT_RACE', 'File changed concurrently.');
+    if (err.message === "COMMIT_RACE") {
+      return formatError("COMMIT_RACE", "File changed concurrently.");
     }
-    return formatError('IO_ERROR', err.message || 'Failed to patch file.');
+    return formatError("IO_ERROR", err.message || "Failed to patch file.");
   }
 }
 
@@ -640,17 +786,21 @@ export function patchService(request: PatchRequest, allowedRoots: string[]) {
  */
 export function initService(targetDir: string) {
   try {
-    const templatesDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../templates');
-    
-    let destDir = path.resolve(targetDir);
-    const normalizedTarget = targetDir.replace(/[\\/]+$/, '').replace(/\\/g, '/');
-    if (!normalizedTarget.endsWith('skills/md-safeedit')) {
-      destDir = path.join(destDir, '.agents/skills/md-safeedit');
-    }
-    
-    const destRefsDir = path.join(destDir, 'references');
-    const destScriptsDir = path.join(destDir, 'scripts');
+    const templatesDir = path.resolve(
+      path.dirname(fileURLToPath(import.meta.url)),
+      "../templates",
+    );
 
+    let destDir = path.resolve(targetDir);
+    const normalizedTarget = targetDir
+      .replace(/[\\/]+$/, "")
+      .replace(/\\/g, "/");
+    if (!normalizedTarget.endsWith("skills/md-safeedit")) {
+      destDir = path.join(destDir, ".agents/skills/md-safeedit");
+    }
+
+    const destRefsDir = path.join(destDir, "references");
+    const destScriptsDir = path.join(destDir, "scripts");
 
     // Create directories
     fs.mkdirSync(destRefsDir, { recursive: true });
@@ -658,25 +808,25 @@ export function initService(targetDir: string) {
 
     // Files to copy
     const files = [
-      'SKILL.md',
-      'references/workflow.md',
-      'references/error-recovery.md',
-      'references/supported-markdown.md',
-      'scripts/md-safeedit'
+      "SKILL.md",
+      "references/workflow.md",
+      "references/error-recovery.md",
+      "references/supported-markdown.md",
+      "scripts/md-safeedit",
     ];
 
     for (const file of files) {
       const srcFile = path.join(templatesDir, file);
       const destFile = path.join(destDir, file);
-      
+
       if (!fs.existsSync(srcFile)) {
         throw new Error(`Template file not found in package: ${file}`);
       }
-      
+
       fs.copyFileSync(srcFile, destFile);
 
       // Make script executable
-      if (file.startsWith('scripts/')) {
+      if (file.startsWith("scripts/")) {
         try {
           fs.chmodSync(destFile, 0o755);
         } catch (_) {
@@ -688,10 +838,323 @@ export function initService(targetDir: string) {
     return {
       ok: true,
       message: `Successfully initialized Agent Skill in ${destDir}`,
-      dest_dir: destDir
+      dest_dir: destDir,
     };
   } catch (err: any) {
-    return formatError('IO_ERROR', `Failed to initialize skill: ${err.message}`);
+    return formatError(
+      "IO_ERROR",
+      `Failed to initialize skill: ${err.message}`,
+    );
   }
 }
 
+/**
+ * Service: safe-replace (combined search, read, patch)
+ */
+export function safeReplaceService(
+  request: SafeReplaceRequest,
+  allowedRoots: string[],
+) {
+  try {
+    const snapshot = createSnapshot(request.file.path, allowedRoots);
+    const parsed = parseMarkdownToNodes(snapshot.bytes, snapshot.content);
+    const nodes = buildLogicalSections(
+      parsed,
+      snapshot.bytes,
+      snapshot.content,
+    );
+
+    const query = request.search.toLowerCase();
+    let candidates = nodes.filter((n) =>
+      n.content.toLowerCase().includes(query),
+    );
+
+    // Filter out nodes that contain other matched nodes (keep only the most specific leaf nodes)
+    candidates = candidates.filter((c) => {
+      return !candidates.some(
+        (other) =>
+          other !== c &&
+          other.range.start >= c.range.start &&
+          other.range.end <= c.range.end &&
+          other.range.end - other.range.start < c.range.end - c.range.start,
+      );
+    });
+
+    if (candidates.length === 0) {
+      return formatError(
+        "TARGET_MISSING",
+        `No node found matching search text: "${request.search}"`,
+      );
+    }
+    if (candidates.length > 1) {
+      return formatError(
+        "ANCHOR_AMBIGUOUS",
+        `Multiple ambiguous nodes found matching search text: "${request.search}"`,
+      );
+    }
+
+    const node = candidates[0];
+
+    // Generate structuralEvidence
+    const pathFingerprint = getPathFingerprint(node.structuralPath);
+
+    let parentFingerprint: string | undefined;
+    let previousFingerprint: string | undefined;
+    let nextFingerprint: string | undefined;
+    let siblingOccurrence: number | undefined;
+
+    if (node.parentRuntimeId) {
+      const parentNode = nodes.find(
+        (n) => n.runtimeId === node.parentRuntimeId,
+      );
+      if (parentNode) {
+        parentFingerprint = parentNode.rawHash;
+
+        const siblingIds = parentNode.childRuntimeIds;
+        const idx = siblingIds.indexOf(node.runtimeId);
+        if (idx - 1 >= 0) {
+          const prevNode = nodes.find(
+            (n) => n.runtimeId === siblingIds[idx - 1],
+          );
+          if (prevNode) previousFingerprint = prevNode.rawHash;
+        }
+        if (idx + 1 < siblingIds.length) {
+          const nextNode = nodes.find(
+            (n) => n.runtimeId === siblingIds[idx + 1],
+          );
+          if (nextNode) nextFingerprint = nextNode.rawHash;
+        }
+
+        let occurrenceCount = 1;
+        for (let i = 0; i < idx; i++) {
+          const sibling = nodes.find((n) => n.runtimeId === siblingIds[i]);
+          if (sibling && sibling.type === node.type) {
+            occurrenceCount++;
+          }
+        }
+        siblingOccurrence = occurrenceCount;
+      }
+    }
+
+    // Generate HMAC-signed anchor token
+    const payload: AnchorPayloadV1 = {
+      version: 1,
+      fileKey: snapshot.canonicalPath,
+      sourceRevision: snapshot.revision,
+      range: node.range,
+      rawHash: node.rawHash,
+      nodeType: node.type,
+      structuralPath: node.structuralPath.map((s) => ({
+        heading: s.heading,
+        level: s.level,
+        occurrence: s.occurrence,
+      })),
+      structuralEvidence: {
+        pathFingerprint,
+        parentFingerprint,
+        previousFingerprint,
+        nextFingerprint,
+        siblingOccurrence,
+        blockId: node.blockId,
+      },
+      blockId: node.blockId,
+      dialect: "commonmark+gfm",
+      issuedAt: Date.now(),
+      expiresAt:
+        Date.now() +
+        (parseInt(process.env.MDSE_TOKEN_TTL_MS ?? "86400000", 10) || 86400000),
+    };
+
+    const token = createToken(payload);
+
+    // Call patchService internally
+    const patchRequest: PatchRequest = {
+      file: request.file,
+      operations: [
+        {
+          op: "replace",
+          anchor_token: token,
+          content: request.replace,
+        },
+      ],
+      options: {
+        dry_run: request.options?.dry_run !== false,
+        atomic: true,
+        validation_level: request.options?.validation_level || "normal",
+      },
+    };
+
+    const patchResult = patchService(patchRequest, allowedRoots);
+
+    if (patchResult.ok && request.options?.dry_run !== false) {
+      return {
+        ...patchResult,
+        anchor_token: token,
+      };
+    }
+
+    return patchResult;
+  } catch (err: any) {
+    return formatError(
+      "IO_ERROR",
+      err.message || "Failed to replace node content.",
+    );
+  }
+}
+
+/**
+ * Service: safe-patch (combined search, read, patch for multiple operations)
+ */
+export function safePatchService(
+  request: SafePatchRequest,
+  allowedRoots: string[],
+) {
+  try {
+    const snapshot = createSnapshot(request.file.path, allowedRoots);
+    const parsed = parseMarkdownToNodes(snapshot.bytes, snapshot.content);
+    const nodes = buildLogicalSections(
+      parsed,
+      snapshot.bytes,
+      snapshot.content,
+    );
+
+    const patchOperations = [];
+
+    for (const op of request.operations) {
+      const query = op.search.toLowerCase();
+      let candidates = nodes.filter((n) =>
+        n.content.toLowerCase().includes(query),
+      );
+
+      // Filter out nodes that contain other matched nodes (keep only the most specific leaf nodes)
+      candidates = candidates.filter((c) => {
+        return !candidates.some(
+          (other) =>
+            other !== c &&
+            other.range.start >= c.range.start &&
+            other.range.end <= c.range.end &&
+            other.range.end - other.range.start < c.range.end - c.range.start,
+        );
+      });
+
+      if (candidates.length === 0) {
+        return formatError(
+          "TARGET_MISSING",
+          `No node found matching search text: "${op.search}"`,
+        );
+      }
+      if (candidates.length > 1) {
+        return formatError(
+          "ANCHOR_AMBIGUOUS",
+          `Multiple ambiguous nodes found matching search text: "${op.search}"`,
+        );
+      }
+
+      const node = candidates[0];
+
+      // Generate structuralEvidence
+      const pathFingerprint = getPathFingerprint(node.structuralPath);
+
+      let parentFingerprint: string | undefined;
+      let previousFingerprint: string | undefined;
+      let nextFingerprint: string | undefined;
+      let siblingOccurrence: number | undefined;
+
+      if (node.parentRuntimeId) {
+        const parentNode = nodes.find(
+          (n) => n.runtimeId === node.parentRuntimeId,
+        );
+        if (parentNode) {
+          parentFingerprint = parentNode.rawHash;
+
+          const siblingIds = parentNode.childRuntimeIds;
+          const idx = siblingIds.indexOf(node.runtimeId);
+          if (idx - 1 >= 0) {
+            const prevNode = nodes.find(
+              (n) => n.runtimeId === siblingIds[idx - 1],
+            );
+            if (prevNode) previousFingerprint = prevNode.rawHash;
+          }
+          if (idx + 1 < siblingIds.length) {
+            const nextNode = nodes.find(
+              (n) => n.runtimeId === siblingIds[idx + 1],
+            );
+            if (nextNode) nextFingerprint = nextNode.rawHash;
+          }
+
+          let occurrenceCount = 1;
+          for (let i = 0; i < idx; i++) {
+            const sibling = nodes.find((n) => n.runtimeId === siblingIds[i]);
+            if (sibling && sibling.type === node.type) {
+              occurrenceCount++;
+            }
+          }
+          siblingOccurrence = occurrenceCount;
+        }
+      }
+
+      // Generate HMAC-signed anchor token
+      const payload: AnchorPayloadV1 = {
+        version: 1,
+        fileKey: snapshot.canonicalPath,
+        sourceRevision: snapshot.revision,
+        range: node.range,
+        rawHash: node.rawHash,
+        nodeType: node.type,
+        structuralPath: node.structuralPath.map((s) => ({
+          heading: s.heading,
+          level: s.level,
+          occurrence: s.occurrence,
+        })),
+        structuralEvidence: {
+          pathFingerprint,
+          parentFingerprint,
+          previousFingerprint,
+          nextFingerprint,
+          siblingOccurrence,
+          blockId: node.blockId,
+        },
+        blockId: node.blockId,
+        dialect: "commonmark+gfm",
+        issuedAt: Date.now(),
+        expiresAt:
+          Date.now() +
+          (parseInt(process.env.MDSE_TOKEN_TTL_MS ?? "86400000", 10) ||
+            86400000),
+      };
+
+      const token = createToken(payload);
+
+      if (op.op === "delete") {
+        patchOperations.push({
+          op: "delete" as const,
+          anchor_token: token,
+        });
+      } else {
+        patchOperations.push({
+          op: op.op,
+          anchor_token: token,
+          content: op.content || "",
+        });
+      }
+    }
+
+    // Call patchService internally
+    const patchRequest: PatchRequest = {
+      file: request.file,
+      operations: patchOperations,
+      options: {
+        dry_run: request.options?.dry_run !== false,
+        atomic: true,
+        validation_level: request.options?.validation_level || "normal",
+      },
+    };
+
+    return patchService(patchRequest, allowedRoots);
+  } catch (err: any) {
+    return formatError(
+      "IO_ERROR",
+      err.message || "Failed to execute safe patch.",
+    );
+  }
+}

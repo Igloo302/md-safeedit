@@ -1,19 +1,19 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { execSync, execFileSync } from 'child_process';
-import * as path from 'path';
-import * as fs from 'fs';
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { execSync, execFileSync } from "child_process";
+import * as path from "path";
+import * as fs from "fs";
 
-const cliPath = path.join(process.cwd(), 'packages/cli/dist/index.js');
-const tempDir = path.join(process.cwd(), 'packages/cli/test-temp-cli');
+const cliPath = path.join(process.cwd(), "packages/cli/dist/index.js");
+const tempDir = path.join(process.cwd(), "packages/cli/test-temp-cli");
 
-describe('CLI Shell Execution and Exit Codes', () => {
-  const filePath = path.join(tempDir, 'cli-test.md');
+describe("CLI Shell Execution and Exit Codes", () => {
+  const filePath = path.join(tempDir, "cli-test.md");
 
   beforeEach(() => {
     if (!fs.existsSync(tempDir)) {
       fs.mkdirSync(tempDir, { recursive: true });
     }
-    fs.writeFileSync(filePath, '# Hello\nThis is a paragraph.\n');
+    fs.writeFileSync(filePath, "# Hello\nThis is a paragraph.\n");
   });
 
   afterEach(() => {
@@ -22,249 +22,494 @@ describe('CLI Shell Execution and Exit Codes', () => {
     }
   });
 
-  const runCli = (args: string[], stdinContent?: string): { status: number | null; stdout: string; stderr: string } => {
+  const runCli = (
+    args: string[],
+    stdinContent?: string,
+  ): { status: number | null; stdout: string; stderr: string } => {
     try {
-      const hasJsonFlags = args.includes('--json') || args.includes('--no-json');
-      const finalArgs = hasJsonFlags ? args : [...args, '--json'];
-      const cleanArgs = finalArgs.filter(a => a !== '--no-json');
-      const stdout = execFileSync('node', [cliPath, ...cleanArgs], {
+      const hasJsonFlags =
+        args.includes("--json") || args.includes("--no-json");
+      const finalArgs = hasJsonFlags ? args : [...args, "--json"];
+      const cleanArgs = finalArgs.filter((a) => a !== "--no-json");
+      const stdout = execFileSync("node", [cliPath, ...cleanArgs], {
         input: stdinContent,
-        encoding: 'utf-8',
-        stdio: ['pipe', 'pipe', 'pipe'],
+        encoding: "utf-8",
+        stdio: ["pipe", "pipe", "pipe"],
         env: {
           ...process.env,
-          MDSE_ALLOWED_ROOTS: tempDir
-        }
+          MDSE_ALLOWED_ROOTS: tempDir,
+        },
       });
-      return { status: 0, stdout, stderr: '' };
+      return { status: 0, stdout, stderr: "" };
     } catch (err: any) {
       return {
         status: err.status ?? null,
-        stdout: err.stdout || '',
-        stderr: err.stderr || ''
+        stdout: err.stdout || "",
+        stderr: err.stderr || "",
       };
     }
   };
 
-  it('exits with 64 on usage / help', () => {
+  it("exits with 64 on usage / help", () => {
     const res = runCli([]);
     expect(res.status).toBe(64);
-    expect(res.stderr).toContain('Usage:');
+    expect(res.stderr).toContain("Usage:");
 
-    const resHelp = runCli(['--help']);
+    const resHelp = runCli(["--help"]);
     expect(resHelp.status).toBe(64);
   });
 
-  it('exits with 64 on missing required parameters', () => {
+  it("exits with 64 on missing required parameters", () => {
     // search requires query
-    const resSearch = runCli(['search', filePath]);
+    const resSearch = runCli(["search", filePath]);
     expect(resSearch.status).toBe(64);
-    expect(resSearch.stderr).toContain('requires a query string');
+    expect(resSearch.stderr).toContain("requires a query string");
 
     // read requires targets
-    const resRead = runCli(['read', filePath]);
+    const resRead = runCli(["read", filePath]);
     expect(resRead.status).toBe(64);
-    expect(resRead.stderr).toContain('requires at least one runtime ID');
+    expect(resRead.stderr).toContain("requires at least one runtime ID");
   });
 
-  it('exits with 64 on invalid JSON stdin input', () => {
-    const res = runCli(['inspect'], 'invalid-json{');
+  it("exits with 64 on invalid JSON stdin input", () => {
+    const res = runCli(["inspect"], "invalid-json{");
     expect(res.status).toBe(64);
     const parsed = JSON.parse(res.stdout);
     expect(parsed.ok).toBe(false);
-    expect(parsed.error.code).toBe('IO_ERROR');
+    expect(parsed.error.code).toBe("IO_ERROR");
   });
 
-  it('exits with 6 on IO error (e.g. file does not exist)', () => {
-    const res = runCli(['inspect', path.join(tempDir, 'non-existent.md')]);
+  it("exits with 6 on IO error (e.g. file does not exist)", () => {
+    const res = runCli(["inspect", path.join(tempDir, "non-existent.md")]);
     expect(res.status).toBe(6);
     const parsed = JSON.parse(res.stdout);
     expect(parsed.ok).toBe(false);
-    expect(parsed.error.code).toBe('IO_ERROR');
+    expect(parsed.error.code).toBe("IO_ERROR");
   });
 
-  it('exits with 5 on validation failure (Zod validation error)', () => {
+  it("exits with 5 on validation failure (Zod validation error)", () => {
     // Pass malformed options to search via stdin JSON mode
     const payload = {
       file: { path: filePath },
-      query: 'Hello',
+      query: "Hello",
       options: {
-        limit: 'not-a-number' // Should trigger Zod validation error
-      }
+        limit: "not-a-number", // Should trigger Zod validation error
+      },
     };
-    const res = runCli(['search'], JSON.stringify(payload));
+    const res = runCli(["search"], JSON.stringify(payload));
     expect(res.status).toBe(5);
     const parsed = JSON.parse(res.stdout);
     expect(parsed.ok).toBe(false);
-    expect(parsed.error.code).toBe('VALIDATION_FAILED');
+    expect(parsed.error.code).toBe("VALIDATION_FAILED");
   });
 
-  it('verifies human-readable text output mode when --json is omitted', () => {
-    const res = runCli(['inspect', filePath, '--no-json']);
+  it("verifies human-readable text output mode when --json is omitted", () => {
+    const res = runCli(["inspect", filePath, "--no-json"]);
     expect(res.status).toBe(0);
-    expect(res.stdout).toContain('mdse CLI version:');
-    expect(res.stdout).toContain('File:');
-    expect(res.stdout).toContain('Outline:');
-    expect(res.stdout).not.toContain('{'); // not JSON
+    expect(res.stdout).toContain("mdse CLI version:");
+    expect(res.stdout).toContain("File:");
+    expect(res.stdout).toContain("Outline:");
+    expect(res.stdout).not.toContain("{"); // not JSON
   });
 
-  it('verifies --version and -v queries', () => {
-    const resVer = runCli(['--version']);
+  it("verifies --version and -v queries", () => {
+    const resVer = runCli(["--version"]);
     const parsedVer = JSON.parse(resVer.stdout);
     expect(parsedVer.ok).toBe(true);
     expect(parsedVer.cli_version).toBeDefined();
 
-    const resVerNoJson = runCli(['-v', '--no-json']);
-    expect(resVerNoJson.stdout).toContain('mdse CLI version:');
+    const resVerNoJson = runCli(["-v", "--no-json"]);
+    expect(resVerNoJson.stdout).toContain("mdse CLI version:");
   });
 
-  it('reads token from file using @ prefix during patch command', () => {
+  it("reads token from file using @ prefix during patch command", () => {
     // 1. Get outline to locate runtime ID of paragraph
-    const inspectRes = runCli(['inspect', filePath]);
+    const inspectRes = runCli(["inspect", filePath]);
     const parsedInspect = JSON.parse(inspectRes.stdout);
     const section = parsedInspect.outline[0];
-    
+
     // 2. Read node to obtain token
-    const readRes = runCli(['read', filePath, section.runtime_id]);
+    const readRes = runCli(["read", filePath, section.runtime_id]);
     const parsedRead = JSON.parse(readRes.stdout);
     const token = parsedRead.nodes[0].anchor_token;
-    
+
     // 3. Write token to a temporary file
-    const tokenFilePath = path.join(tempDir, 'token-temp.txt');
+    const tokenFilePath = path.join(tempDir, "token-temp.txt");
     fs.writeFileSync(tokenFilePath, token);
-    
+
     // 4. Run patch by specifying @tokenFilePath as argument
-    const patchRes = runCli(['patch', filePath, 'replace', `@${tokenFilePath}`, '## Hello\nUpdated content\n', '--commit']);
+    const patchRes = runCli([
+      "patch",
+      filePath,
+      "replace",
+      `@${tokenFilePath}`,
+      "## Hello\nUpdated content\n",
+      "--commit",
+    ]);
     expect(patchRes.status).toBe(0);
     const parsedPatch = JSON.parse(patchRes.stdout);
     expect(parsedPatch.ok).toBe(true);
-    expect(parsedPatch.status).toBe('committed');
-    
+    expect(parsedPatch.status).toBe("committed");
+
     // 5. Confirm file content updated
-    const updatedContent = fs.readFileSync(filePath, 'utf-8');
-    expect(updatedContent).toContain('Updated content');
+    const updatedContent = fs.readFileSync(filePath, "utf-8");
+    expect(updatedContent).toContain("Updated content");
   });
 
-  it('reads content from file using @ prefix during patch command', () => {
+  it("reads content from file using @ prefix during patch command", () => {
     // 1. Get outline to locate runtime ID of paragraph
-    const inspectRes = runCli(['inspect', filePath]);
+    const inspectRes = runCli(["inspect", filePath]);
     const parsedInspect = JSON.parse(inspectRes.stdout);
     const section = parsedInspect.outline[0];
-    
+
     // 2. Read node to obtain token
-    const readRes = runCli(['read', filePath, section.runtime_id]);
+    const readRes = runCli(["read", filePath, section.runtime_id]);
     const parsedRead = JSON.parse(readRes.stdout);
     const token = parsedRead.nodes[0].anchor_token;
-    
+
     // 3. Write content to a temporary file
-    const contentFilePath = path.join(tempDir, 'content-temp.txt');
-    fs.writeFileSync(contentFilePath, '## Hello\nUpdated content from file\n');
-    
+    const contentFilePath = path.join(tempDir, "content-temp.txt");
+    fs.writeFileSync(contentFilePath, "## Hello\nUpdated content from file\n");
+
     // 4. Run patch by specifying @contentFilePath as the content argument
-    const patchRes = runCli(['patch', filePath, 'replace', token, `@${contentFilePath}`, '--commit']);
+    const patchRes = runCli([
+      "patch",
+      filePath,
+      "replace",
+      token,
+      `@${contentFilePath}`,
+      "--commit",
+    ]);
     expect(patchRes.status).toBe(0);
     const parsedPatch = JSON.parse(patchRes.stdout);
     expect(parsedPatch.ok).toBe(true);
-    expect(parsedPatch.status).toBe('committed');
-    
+    expect(parsedPatch.status).toBe("committed");
+
     // 5. Confirm file content updated
-    const updatedContent = fs.readFileSync(filePath, 'utf-8');
-    expect(updatedContent).toContain('Updated content from file');
+    const updatedContent = fs.readFileSync(filePath, "utf-8");
+    expect(updatedContent).toContain("Updated content from file");
   });
 
-  it('unescapes escape sequences in patch content argument by default', () => {
+  it("unescapes escape sequences in patch content argument by default", () => {
     // 1. Get outline to locate runtime ID of paragraph
-    const inspectRes = runCli(['inspect', filePath]);
+    const inspectRes = runCli(["inspect", filePath]);
     const parsedInspect = JSON.parse(inspectRes.stdout);
     const section = parsedInspect.outline[0];
-    
+
     // 2. Read node to obtain token
-    const readRes = runCli(['read', filePath, section.runtime_id]);
+    const readRes = runCli(["read", filePath, section.runtime_id]);
     const parsedRead = JSON.parse(readRes.stdout);
     const token = parsedRead.nodes[0].anchor_token;
-    
+
     // 3. Run patch by specifying content with literal \n and escaped backslash \\n
-    const patchRes = runCli(['patch', filePath, 'replace', token, '## Hello\\nLine1\\nLine2\\\\nEscaped', '--commit']);
+    const patchRes = runCli([
+      "patch",
+      filePath,
+      "replace",
+      token,
+      "## Hello\\nLine1\\nLine2\\\\nEscaped",
+      "--commit",
+    ]);
     expect(patchRes.status).toBe(0);
-    
+
     // 4. Confirm file content updated with real newlines and escaped backslash-n
-    const updatedContent = fs.readFileSync(filePath, 'utf-8');
-    expect(updatedContent).toContain('Line1\nLine2\\nEscaped');
+    const updatedContent = fs.readFileSync(filePath, "utf-8");
+    expect(updatedContent).toContain("Line1\nLine2\\nEscaped");
   });
 
-  it('keeps literal backslash-n in patch content when --raw is specified', () => {
+  it("keeps literal backslash-n in patch content when --raw is specified", () => {
     // 1. Get outline to locate runtime ID of paragraph
-    const inspectRes = runCli(['inspect', filePath]);
+    const inspectRes = runCli(["inspect", filePath]);
     const parsedInspect = JSON.parse(inspectRes.stdout);
     const section = parsedInspect.outline[0];
-    
+
     // 2. Read node to obtain token
-    const readRes = runCli(['read', filePath, section.runtime_id]);
+    const readRes = runCli(["read", filePath, section.runtime_id]);
     const parsedRead = JSON.parse(readRes.stdout);
     const token = parsedRead.nodes[0].anchor_token;
-    
+
     // 3. Run patch by specifying content with literal \n and --raw flag
-    const patchRes = runCli(['patch', filePath, 'replace', token, '## Hello\\nLine3\\nLine4', '--commit', '--raw']);
+    const patchRes = runCli([
+      "patch",
+      filePath,
+      "replace",
+      token,
+      "## Hello\\nLine3\\nLine4",
+      "--commit",
+      "--raw",
+    ]);
     expect(patchRes.status).toBe(0);
-    
+
     // 4. Confirm file content has literal \\n
-    const updatedContent = fs.readFileSync(filePath, 'utf-8');
-    expect(updatedContent).toContain('Line3\\nLine4');
+    const updatedContent = fs.readFileSync(filePath, "utf-8");
+    expect(updatedContent).toContain("Line3\\nLine4");
   });
 
-  it('emits warnings when dollar signs are potentially swallowed by the shell', () => {
+  it("emits warnings when dollar signs are potentially swallowed by the shell", () => {
     // 1. Create a file containing a dollar price
-    const dollarFile = path.join(tempDir, 'dollar.md');
-    fs.writeFileSync(dollarFile, '# Product\nThe price is $79 today.');
-    
-    const inspectRes = runCli(['inspect', dollarFile]);
+    const dollarFile = path.join(tempDir, "dollar.md");
+    fs.writeFileSync(dollarFile, "# Product\nThe price is $79 today.");
+
+    const inspectRes = runCli(["inspect", dollarFile]);
     const parsedInspect = JSON.parse(inspectRes.stdout);
     const secNode = parsedInspect.outline[0]; // first section
-    
-    const readRes = runCli(['read', dollarFile, secNode.runtime_id]);
+
+    const readRes = runCli(["read", dollarFile, secNode.runtime_id]);
     const parsedRead = JSON.parse(readRes.stdout);
     const token = parsedRead.nodes[0].anchor_token;
-    
+
     // 2. Try replacement where $79 becomes 79 (missing $)
-    const patchRes1 = runCli(['patch', dollarFile, 'replace', token, '# Product\nThe price is 79 today.']);
+    const patchRes1 = runCli([
+      "patch",
+      dollarFile,
+      "replace",
+      token,
+      "# Product\nThe price is 79 today.",
+    ]);
     const parsedPatch1 = JSON.parse(patchRes1.stdout);
     expect(parsedPatch1.warnings).toBeDefined();
     expect(parsedPatch1.warnings.length).toBeGreaterThan(0);
-    expect(parsedPatch1.warnings[0]).toContain('swallowed');
+    expect(parsedPatch1.warnings[0]).toContain("swallowed");
 
     // 3. Try replacement where $79 becomes 9 (missing $7)
-    const patchRes2 = runCli(['patch', dollarFile, 'replace', token, '# Product\nThe price is 9 today.']);
+    const patchRes2 = runCli([
+      "patch",
+      dollarFile,
+      "replace",
+      token,
+      "# Product\nThe price is 9 today.",
+    ]);
     const parsedPatch2 = JSON.parse(patchRes2.stdout);
     expect(parsedPatch2.warnings).toBeDefined();
     expect(parsedPatch2.warnings.length).toBeGreaterThan(0);
-    expect(parsedPatch2.warnings[0]).toContain('swallowed');
+    expect(parsedPatch2.warnings[0]).toContain("swallowed");
 
     // 4. Try valid replacement where $79 becomes $89 (should NOT emit warning)
-    const patchRes3 = runCli(['patch', dollarFile, 'replace', token, '# Product\nThe price is $89 today.']);
+    const patchRes3 = runCli([
+      "patch",
+      dollarFile,
+      "replace",
+      token,
+      "# Product\nThe price is $89 today.",
+    ]);
     const parsedPatch3 = JSON.parse(patchRes3.stdout);
     expect(parsedPatch3.warnings).toBeDefined();
     expect(parsedPatch3.warnings.length).toBe(0);
 
     // 5. Try valid replacement where $79 becomes $179 (should NOT emit warning)
-    const patchRes4 = runCli(['patch', dollarFile, 'replace', token, '# Product\nThe price is $179 today.']);
+    const patchRes4 = runCli([
+      "patch",
+      dollarFile,
+      "replace",
+      token,
+      "# Product\nThe price is $179 today.",
+    ]);
     const parsedPatch4 = JSON.parse(patchRes4.stdout);
     expect(parsedPatch4.warnings).toBeDefined();
     expect(parsedPatch4.warnings.length).toBe(0);
   });
 
-  it('prints only the raw content when read is called with --raw', () => {
-    const inspectRes = runCli(['inspect', filePath]);
+  it("prints only the raw content when read is called with --raw", () => {
+    const inspectRes = runCli(["inspect", filePath]);
     const parsedInspect = JSON.parse(inspectRes.stdout);
     const section = parsedInspect.outline[0];
-    
+
     // Call read with --raw (non-JSON mode)
-    const readRes = runCli(['read', filePath, section.runtime_id, '--raw']);
+    const readRes = runCli(["read", filePath, section.runtime_id, "--raw"]);
     expect(readRes.status).toBe(0);
-    
+
     // Should print only the raw markdown of the section
-    expect(readRes.stdout).not.toContain('Runtime ID:');
-    expect(readRes.stdout).not.toContain('{');
-    expect(readRes.stdout).toContain('# Hello');
+    expect(readRes.stdout).not.toContain("Runtime ID:");
+    expect(readRes.stdout).not.toContain("{");
+    expect(readRes.stdout).toContain("# Hello");
+  });
+
+  describe("safe-replace subcommand", () => {
+    it("previews changes and returns an anchor token in dry-run mode", () => {
+      const res = runCli([
+        "safe-replace",
+        filePath,
+        "paragraph",
+        "replacement text",
+      ]);
+      expect(res.status).toBe(0);
+      const parsed = JSON.parse(res.stdout);
+      expect(parsed.ok).toBe(true);
+      expect(parsed.status).toBe("preview");
+      expect(parsed.anchor_token).toBeDefined();
+      expect(parsed.diff).toContain("-This is a paragraph.");
+      expect(parsed.diff).toContain("+replacement text");
+
+      // Assert that file is unmodified
+      const content = fs.readFileSync(filePath, "utf-8");
+      expect(content).toContain("This is a paragraph.");
+    });
+
+    it("modifies the document when called with --commit", () => {
+      const res = runCli([
+        "safe-replace",
+        filePath,
+        "paragraph",
+        "replacement text",
+        "--commit",
+      ]);
+      expect(res.status).toBe(0);
+      const parsed = JSON.parse(res.stdout);
+      expect(parsed.ok).toBe(true);
+      expect(parsed.status).toBe("committed");
+
+      // Assert file is modified
+      const content = fs.readFileSync(filePath, "utf-8");
+      expect(content).not.toContain("This is a paragraph.");
+      expect(content).toContain("replacement text");
+    });
+
+    it("returns ANCHOR_AMBIGUOUS if search text matches multiple nodes", () => {
+      const fileAmb = path.join(tempDir, "amb.md");
+      fs.writeFileSync(
+        fileAmb,
+        "# Section 1\nTarget.\n\n# Section 2\nTarget.\n",
+      );
+
+      const res = runCli([
+        "safe-replace",
+        fileAmb,
+        "Target",
+        "replacement text",
+      ]);
+      expect(res.status).toBe(4);
+      const parsed = JSON.parse(res.stdout);
+      expect(parsed.ok).toBe(false);
+      expect(parsed.error.code).toBe("ANCHOR_AMBIGUOUS");
+    });
+
+    it("returns TARGET_MISSING if search text matches no nodes", () => {
+      const res = runCli([
+        "safe-replace",
+        filePath,
+        "non-existent-text",
+        "replacement text",
+      ]);
+      expect(res.status).toBe(2);
+      const parsed = JSON.parse(res.stdout);
+      expect(parsed.ok).toBe(false);
+      expect(parsed.error.code).toBe("TARGET_MISSING");
+    });
+  });
+
+  describe("safe-patch subcommand", () => {
+    it("previews changes for single-op (replace) in dry-run mode", () => {
+      const res = runCli([
+        "safe-patch",
+        filePath,
+        "replace",
+        "paragraph",
+        "replacement text",
+      ]);
+      expect(res.status).toBe(0);
+      const parsed = JSON.parse(res.stdout);
+      expect(parsed.ok).toBe(true);
+      expect(parsed.status).toBe("preview");
+      expect(parsed.diff).toContain("-This is a paragraph.");
+      expect(parsed.diff).toContain("+replacement text");
+    });
+
+    it("modifies document with --commit for single-op (insert_after)", () => {
+      const fileInsert = path.join(tempDir, "insert.md");
+      fs.writeFileSync(fileInsert, "# Hello\nThis is paragraph A.\n");
+
+      const res = runCli([
+        "safe-patch",
+        fileInsert,
+        "insert_after",
+        "paragraph A",
+        "This is paragraph B.",
+        "--commit",
+      ]);
+      expect(res.status).toBe(0);
+      const parsed = JSON.parse(res.stdout);
+      expect(parsed.ok).toBe(true);
+      expect(parsed.status).toBe("committed");
+
+      const content = fs.readFileSync(fileInsert, "utf-8");
+      expect(content).toContain("This is paragraph A.\nThis is paragraph B.");
+    });
+
+    it("deletes a node with --commit for single-op (delete)", () => {
+      const fileDelete = path.join(tempDir, "delete.md");
+      fs.writeFileSync(fileDelete, "# Hello\nThis is paragraph A.\n");
+
+      const res = runCli([
+        "safe-patch",
+        fileDelete,
+        "delete",
+        "paragraph A",
+        "--commit",
+      ]);
+      expect(res.status).toBe(0);
+      const parsed = JSON.parse(res.stdout);
+      expect(parsed.ok).toBe(true);
+      expect(parsed.status).toBe("committed");
+
+      const content = fs.readFileSync(fileDelete, "utf-8");
+      expect(content).not.toContain("This is paragraph A.");
+    });
+
+    it("runs multi-op transaction from a JSON payload file", () => {
+      const fileMulti = path.join(tempDir, "multi.md");
+      fs.writeFileSync(
+        fileMulti,
+        "# Hello\nThis is paragraph A.\n\nThis is paragraph B.\n",
+      );
+
+      const payloadFile = path.join(tempDir, "payload.json");
+      fs.writeFileSync(
+        payloadFile,
+        JSON.stringify({
+          operations: [
+            {
+              op: "replace",
+              search: "paragraph A",
+              content: "A modified",
+            },
+            {
+              op: "insert_after",
+              search: "paragraph B",
+              content: "This is paragraph C.",
+            },
+          ],
+        }),
+      );
+
+      const res = runCli(["safe-patch", fileMulti, payloadFile, "--commit"]);
+      expect(res.status).toBe(0);
+      const parsed = JSON.parse(res.stdout);
+      expect(parsed.ok).toBe(true);
+      expect(parsed.status).toBe("committed");
+
+      const content = fs.readFileSync(fileMulti, "utf-8");
+      expect(content).toContain("A modified");
+      expect(content).toContain("This is paragraph B.\nThis is paragraph C.");
+    });
+
+    it("returns ANCHOR_AMBIGUOUS if any search query is ambiguous", () => {
+      const fileAmb = path.join(tempDir, "amb-patch.md");
+      fs.writeFileSync(
+        fileAmb,
+        "# Section 1\nTarget.\n\n# Section 2\nTarget.\n",
+      );
+
+      const res = runCli([
+        "safe-patch",
+        fileAmb,
+        "replace",
+        "Target",
+        "replacement text",
+      ]);
+      expect(res.status).toBe(4);
+      const parsed = JSON.parse(res.stdout);
+      expect(parsed.ok).toBe(false);
+      expect(parsed.error.code).toBe("ANCHOR_AMBIGUOUS");
+    });
   });
 });
-

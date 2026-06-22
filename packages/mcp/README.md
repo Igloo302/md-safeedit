@@ -6,11 +6,13 @@ This package exposes MD SafeEdit as an MCP server, allowing AI coding assistants
 
 ## Features
 
-Exposes the 4 core MD SafeEdit services as MCP tools:
+Exposes the core MD SafeEdit services as MCP tools:
 1. **`inspect`**: Inspects a Markdown file's outline, line endings, size, and current revision.
 2. **`search`**: Searches for text patterns within structural nodes or section paths.
 3. **`read`**: Reads target node contents and acquires signed, opaque `anchor_token`s.
 4. **`patch`**: Safely performs edits (replace, delete, insert) using issued anchor tokens with relocation and concurrency protection.
+5. **`safe_replace`**: A high-level, atomic tool combining search, read, and patch to locate a unique node containing the specified search text and replace it. Reduces round-trips and saves tokens.
+6. **`safe_patch`**: A high-level, atomic tool combining search, read, and patch to execute multiple replace, delete, insert_before, or insert_after operations atomically based on search anchors.
 
 ## Installation
 

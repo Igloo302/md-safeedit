@@ -23,27 +23,47 @@ Use this Skill to safely read and edit existing Markdown documents (`.md` or `.m
 
 ---
 
-## ⚡ Core Workflow Summary
+## ⚡ Core Workflows
 
+### Option A: Combined Atomic Replace/Patch (Recommended - 1 Step)
+Use this option when the target block contains unique text that allows direct relocation. It reduces agent turns and token consumption:
+
+- **Single node replacement**:
+```bash
+# Dry-run patch (Preview)
+mdse safe-replace path/to/document.md "Exact unique target text" "New content" --json
+
+# Commit patch
+mdse safe-replace path/to/document.md "Exact unique target text" "New content" --commit --json
+```
+If using MCP, invoke the `safe_replace` tool directly with `file`, `search`, and `replace` arguments.
+
+- **General operations (replace, delete, insert_before, insert_after) or multi-op transactions**:
+```bash
+# Dry-run single-op
+mdse safe-patch path/to/document.md replace "Exact unique target text" "New content" --json
+mdse safe-patch path/to/document.md delete "Exact unique target text" --json
+
+# Commit multi-op transaction using payload JSON
+mdse safe-patch path/to/document.md path/to/payload.json --commit --json
+```
+If using MCP, invoke the `safe_patch` tool directly with `file` and `operations` array.
+
+---
+
+### Option B: Sequential Edit Cycle (Multi-Step fallback)
+Use this option for complex merges or when the search text is ambiguous:
 ```text
-Inspect / Search (Locate Target ID)
-       ↓
-Read (Acquire Content & Signed Anchor Token)
-       ↓
-Edit (Compute replacement locally)
-       ↓
-Dry-run Patch (Verify preview diff)
-       ↓
-Commit Patch (Apply mutation to disk)
+Inspect / Search (Locate Target ID) -> Read (Acquire Token) -> Edit -> Dry-run Patch -> Commit Patch
 ```
 
-### 1. Version Compatibility Check
+#### 1. Version Compatibility Check
 Before starting any edit, check version compatibility:
 ```bash
 mdse --version
 ```
 
-### 2. Locate and Read
+#### 2. Locate and Read
 Find the node `runtime_id` and acquire the signed `anchor_token`:
 ```bash
 # Outline structure
@@ -53,8 +73,8 @@ mdse inspect path/to/document.md --json
 mdse read path/to/document.md "section_runtime_id" --json
 ```
 
-### 3. Dry-run and Commit
-Apply the replacement. The patch defaults to dry-run (preview). Add `--commit` to write to disk:
+#### 3. Dry-run and Commit
+Apply the replacement:
 ```bash
 # Dry-run patch (Preview)
 mdse patch path/to/document.md replace "anchor_token_here" "New content" --json

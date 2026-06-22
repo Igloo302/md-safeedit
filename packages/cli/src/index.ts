@@ -1,27 +1,31 @@
 #!/usr/bin/env node
 
-import * as fs from 'fs';
-import * as path from 'path';
-import { createRequire } from 'module';
-import { 
-  InspectRequestSchema, 
-  SearchRequestSchema, 
-  ReadRequestSchema, 
-  PatchRequestSchema 
-} from '@md-safeedit/protocol';
-import { 
-  inspectService, 
-  searchService, 
-  readService, 
+import * as fs from "fs";
+import * as path from "path";
+import { createRequire } from "module";
+import {
+  InspectRequestSchema,
+  SearchRequestSchema,
+  ReadRequestSchema,
+  PatchRequestSchema,
+  SafeReplaceRequestSchema,
+  SafePatchRequestSchema,
+} from "@md-safeedit/protocol";
+import {
+  inspectService,
+  searchService,
+  readService,
   patchService,
   initService,
-  formatError
-} from './services.js';
+  formatError,
+  safeReplaceService,
+  safePatchService,
+} from "./services.js";
 
 const require = createRequire(import.meta.url);
-let cliVersion = '0.1.4-dev';
+let cliVersion = "0.1.4-dev";
 try {
-  const pkg = require('../package.json');
+  const pkg = require("../package.json");
   cliVersion = pkg.version;
 } catch (e) {
   // fallback
@@ -29,22 +33,24 @@ try {
 
 // Read allowed roots from environment variable or default to process.cwd()
 const envRoots = process.env.MDSE_ALLOWED_ROOTS;
-const allowedRoots = envRoots ? envRoots.split(',').map((r: string) => r.trim()) : [process.cwd()];
+const allowedRoots = envRoots
+  ? envRoots.split(",").map((r: string) => r.trim())
+  : [process.cwd()];
 
 /**
  * Reads all content from stdin.
  */
 function readStdin(): Promise<string> {
   return new Promise((resolve, reject) => {
-    let data = '';
-    process.stdin.setEncoding('utf-8');
-    process.stdin.on('data', (chunk: any) => {
+    let data = "";
+    process.stdin.setEncoding("utf-8");
+    process.stdin.on("data", (chunk: any) => {
       data += chunk;
     });
-    process.stdin.on('end', () => {
+    process.stdin.on("end", () => {
       resolve(data);
     });
-    process.stdin.on('error', err => {
+    process.stdin.on("error", (err) => {
       reject(err);
     });
   });
@@ -52,10 +58,10 @@ function readStdin(): Promise<string> {
 
 function formatHumanFriendly(command: string, result: any): string {
   const header = `mdse CLI version: ${result.cli_version} | Protocol version: ${result.protocol_version}`;
-  
+
   if (result.ok === false) {
     let out = `${header}\n`;
-    out += `Error [${result.error?.code || 'UNKNOWN'}]: ${result.error?.message || 'An unexpected error occurred.'}\n`;
+    out += `Error [${result.error?.code || "UNKNOWN"}]: ${result.error?.message || "An unexpected error occurred."}\n`;
     if (result.error?.recommended_action) {
       out += `Recommended Action: ${result.error.recommended_action}\n`;
     }
@@ -67,46 +73,48 @@ function formatHumanFriendly(command: string, result: any): string {
 
   let out = `${header}\n`;
   switch (command) {
-    case 'inspect': {
-      out += `File: ${result.document?.display_path || ''}\n`;
-      out += `Revision: ${result.document?.revision || ''}\n`;
+    case "inspect": {
+      out += `File: ${result.document?.display_path || ""}\n`;
+      out += `Revision: ${result.document?.revision || ""}\n`;
       out += `Size: ${result.document?.size_bytes || 0} bytes\n`;
-      out += `Line Ending: ${result.document?.line_ending || ''}\n\n`;
+      out += `Line Ending: ${result.document?.line_ending || ""}\n\n`;
       out += `Outline:\n`;
       if (Array.isArray(result.outline)) {
         for (const item of result.outline) {
-          const indent = '  '.repeat(item.level);
-          out += `${indent}${item.type === 'section' ? '#' : ''} ${item.title} (runtime_id: ${item.runtime_id})\n`;
+          const indent = "  ".repeat(item.level);
+          out += `${indent}${item.type === "section" ? "#" : ""} ${item.title} (runtime_id: ${item.runtime_id})\n`;
         }
       }
       break;
     }
-    case 'search': {
-      out += `Document Revision: ${result.document_revision || ''}\n`;
+    case "search": {
+      out += `Document Revision: ${result.document_revision || ""}\n`;
       out += `Search results:\n`;
       if (Array.isArray(result.matches)) {
         if (result.matches.length === 0) {
           out += `  No matches found.\n`;
         }
         for (const match of result.matches) {
-          const pathStr = match.path?.map((p: any) => p.heading).join(' > ') || 'Root';
+          const pathStr =
+            match.path?.map((p: any) => p.heading).join(" > ") || "Root";
           out += `  - [${pathStr}] (runtime_id: ${match.runtime_id})\n`;
           out += `    Preview: ${match.preview}\n`;
         }
       }
       break;
     }
-    case 'read': {
-      out += `Document Revision: ${result.document_revision || ''}\n`;
+    case "read": {
+      out += `Document Revision: ${result.document_revision || ""}\n`;
       out += `Nodes:\n`;
       if (Array.isArray(result.nodes)) {
         for (const node of result.nodes) {
           out += `----------------------------------------\n`;
-          out += `Runtime ID: ${node.runtime_id || ''}\n`;
-          out += `Type: ${node.type || ''}\n`;
-          const pathStr = node.path?.map((p: any) => p.heading).join(' > ') || 'Root';
+          out += `Runtime ID: ${node.runtime_id || ""}\n`;
+          out += `Type: ${node.type || ""}\n`;
+          const pathStr =
+            node.path?.map((p: any) => p.heading).join(" > ") || "Root";
           out += `Path: ${pathStr}\n`;
-          out += `Anchor Token: ${node.anchor_token || ''}\n`;
+          out += `Anchor Token: ${node.anchor_token || ""}\n`;
           if (node.neighbors) {
             if (node.neighbors.previous?.length) {
               out += `Neighbors (Previous):\n`;
@@ -127,12 +135,12 @@ function formatHumanFriendly(command: string, result: any): string {
       }
       break;
     }
-    case 'patch': {
-      out += `Status: ${result.status || ''}\n`;
-      out += `Source Revision: ${result.source_revision || ''}\n`;
-      const rev = result.new_revision || result.result_revision || '';
+    case "patch": {
+      out += `Status: ${result.status || ""}\n`;
+      out += `Source Revision: ${result.source_revision || ""}\n`;
+      const rev = result.new_revision || result.result_revision || "";
       out += `Result/New Revision: ${rev}\n`;
-      out += `Relocated: ${result.relocated ? 'Yes' : 'No'}\n`;
+      out += `Relocated: ${result.relocated ? "Yes" : "No"}\n`;
       if (Array.isArray(result.warnings) && result.warnings.length > 0) {
         out += `Warnings:\n`;
         for (const w of result.warnings) {
@@ -141,13 +149,35 @@ function formatHumanFriendly(command: string, result: any): string {
       }
       out += `Diff:\n`;
       out += `----------------------------------------\n`;
-      out += `${result.diff || 'No changes.'}\n`;
+      out += `${result.diff || "No changes."}\n`;
       out += `----------------------------------------\n`;
       break;
     }
-    case 'init': {
-      out += `Message: ${result.message || ''}\n`;
-      out += `Destination Directory: ${result.dest_dir || ''}\n`;
+    case "init": {
+      out += `Message: ${result.message || ""}\n`;
+      out += `Destination Directory: ${result.dest_dir || ""}\n`;
+      break;
+    }
+    case "safe-replace":
+    case "safe-patch": {
+      out += `Status: ${result.status || ""}\n`;
+      out += `Source Revision: ${result.source_revision || ""}\n`;
+      const rev = result.new_revision || result.result_revision || "";
+      out += `Result/New Revision: ${rev}\n`;
+      out += `Relocated: ${result.relocated ? "Yes" : "No"}\n`;
+      if (result.anchor_token) {
+        out += `Anchor Token: ${result.anchor_token}\n`;
+      }
+      if (Array.isArray(result.warnings) && result.warnings.length > 0) {
+        out += `Warnings:\n`;
+        for (const w of result.warnings) {
+          out += `  ⚠️  ${w}\n`;
+        }
+      }
+      out += `Diff:\n`;
+      out += `----------------------------------------\n`;
+      out += `${result.diff || "No changes."}\n`;
+      out += `----------------------------------------\n`;
       break;
     }
     default:
@@ -158,16 +188,16 @@ function formatHumanFriendly(command: string, result: any): string {
 
 async function main() {
   const args = process.argv.slice(2);
-  
+
   // Extract --json flag
-  const jsonIndex = args.indexOf('--json');
+  const jsonIndex = args.indexOf("--json");
   const hasJsonFlag = jsonIndex !== -1;
   if (hasJsonFlag) {
     args.splice(jsonIndex, 1);
   }
 
   // Extract --raw flag
-  const rawIndex = args.indexOf('--raw');
+  const rawIndex = args.indexOf("--raw");
   const hasRawFlag = rawIndex !== -1;
   if (hasRawFlag) {
     args.splice(rawIndex, 1);
@@ -176,13 +206,19 @@ async function main() {
   const command = args[0];
 
   // Handle version queries
-  if (command === '--version' || command === '-v') {
+  if (command === "--version" || command === "-v") {
     if (hasJsonFlag) {
-      console.log(JSON.stringify({
-        ok: true,
-        cli_version: cliVersion,
-        protocol_version: '1.0'
-      }, null, 2));
+      console.log(
+        JSON.stringify(
+          {
+            ok: true,
+            cli_version: cliVersion,
+            protocol_version: "1.0",
+          },
+          null,
+          2,
+        ),
+      );
     } else {
       console.log(`mdse CLI version: ${cliVersion}`);
       console.log(`Protocol version: 1.0`);
@@ -190,24 +226,39 @@ async function main() {
     process.exit(0);
   }
 
-  if (!command || ['--help', '-h'].includes(command)) {
-    console.error('MD SafeEdit CLI');
-    console.error('Usage:');
-    console.error('  As command line tool:');
-    console.error('    mdse inspect <filePath> [--json]');
-    console.error('    mdse search <filePath> <query> [--json]');
-    console.error('    mdse read <filePath> <runtimeId1> [runtimeId2 ...] [--raw] [--json]');
-    console.error('    mdse patch <filePath> <op: replace|delete|insert_before|insert_after> <anchorToken> [content] [--commit] [--raw] [--json]');
-    console.error('    mdse init [targetDir] [--json]');
-    console.error('  As stdin/JSON tool (when no additional arguments are supplied):');
-    console.error('    echo <JSON_PAYLOAD> | mdse <command>');
+  if (!command || ["--help", "-h"].includes(command)) {
+    console.error("MD SafeEdit CLI");
+    console.error("Usage:");
+    console.error("  As command line tool:");
+    console.error("    mdse inspect <filePath> [--json]");
+    console.error("    mdse search <filePath> <query> [--json]");
+    console.error(
+      "    mdse read <filePath> <runtimeId1> [runtimeId2 ...] [--raw] [--json]",
+    );
+    console.error(
+      "    mdse patch <filePath> <op: replace|delete|insert_before|insert_after> <anchorToken> [content] [--commit] [--raw] [--json]",
+    );
+    console.error(
+      "    mdse safe-replace <filePath> <search> <replace> [--commit] [--raw] [--json]",
+    );
+    console.error(
+      "    mdse safe-patch <filePath> <op> <search> [content] [--commit] [--raw] [--json]",
+    );
+    console.error(
+      "    mdse safe-patch <filePath> <jsonPayloadPath> [--commit] [--raw] [--json]",
+    );
+    console.error("    mdse init [targetDir] [--json]");
+    console.error(
+      "  As stdin/JSON tool (when no additional arguments are supplied):",
+    );
+    console.error("    echo <JSON_PAYLOAD> | mdse <command>");
     process.exit(64);
   }
 
-  if (command === 'init') {
+  if (command === "init") {
     const targetDir = args[1] || process.cwd();
     const result = initService(targetDir) as any;
-    result.protocol_version = '1.0';
+    result.protocol_version = "1.0";
     result.cli_version = cliVersion;
     if (hasJsonFlag) {
       console.log(JSON.stringify(result, null, 2));
@@ -227,75 +278,87 @@ async function main() {
 
   // Check if args are provided for command-line arguments mode
   if (args.length > 1) {
-    if (command === 'inspect') {
+    if (command === "inspect") {
       jsonPayload = {
-        file: { path: args[1] }
+        file: { path: args[1] },
       };
-    } else if (command === 'search') {
+    } else if (command === "search") {
       if (args.length < 3) {
-        console.error('Error: "search" requires a query string argument. Hint: Run "mdse search <filePath> <query>".');
+        console.error(
+          'Error: "search" requires a query string argument. Hint: Run "mdse search <filePath> <query>".',
+        );
         process.exit(64);
       }
       jsonPayload = {
         file: { path: args[1] },
-        query: args[2]
+        query: args[2],
       };
-    } else if (command === 'read') {
+    } else if (command === "read") {
       if (args.length < 3) {
-        console.error('Error: "read" requires at least one runtime ID. Hint: Run "mdse read <filePath> <runtimeId1> ...".');
+        console.error(
+          'Error: "read" requires at least one runtime ID. Hint: Run "mdse read <filePath> <runtimeId1> ...".',
+        );
         process.exit(64);
       }
       const runtimeIds = args.slice(2);
       jsonPayload = {
         file: { path: args[1] },
-        targets: runtimeIds.map(id => ({ runtime_id: id }))
+        targets: runtimeIds.map((id) => ({ runtime_id: id })),
       };
-    } else if (command === 'patch') {
+    } else if (command === "patch") {
       if (args.length < 4) {
-        console.error('Error: "patch" requires operation (replace|delete|insert_before|insert_after) and anchor token. Hint: Run "mdse patch <filePath> <op> <anchorToken> [content] [--commit]".');
+        console.error(
+          'Error: "patch" requires operation (replace|delete|insert_before|insert_after) and anchor token. Hint: Run "mdse patch <filePath> <op> <anchorToken> [content] [--commit]".',
+        );
         process.exit(64);
       }
       const op = args[2];
       let anchorToken = args[3];
-      if (anchorToken.startsWith('@')) {
+      if (anchorToken.startsWith("@")) {
         const tokenFilePath = anchorToken.slice(1);
         const resolvedPath = path.resolve(process.cwd(), tokenFilePath);
         try {
-          anchorToken = fs.readFileSync(resolvedPath, 'utf-8').trim();
+          anchorToken = fs.readFileSync(resolvedPath, "utf-8").trim();
         } catch (err: any) {
-          console.error(`Error: Failed to read token file "${resolvedPath}": ${err.message}`);
+          console.error(
+            `Error: Failed to read token file "${resolvedPath}": ${err.message}`,
+          );
           process.exit(64);
         }
       }
-      
-      const hasCommit = args.includes('--commit');
-      const cleanArgs = args.filter(a => a !== '--commit');
-      let content = '';
-      if (op !== 'delete') {
+
+      const hasCommit = args.includes("--commit");
+      const cleanArgs = args.filter((a) => a !== "--commit");
+      let content = "";
+      if (op !== "delete") {
         const potentialContent = cleanArgs[4];
         if (potentialContent) {
           content = potentialContent;
-          if (content.startsWith('@')) {
+          if (content.startsWith("@")) {
             const contentFilePath = content.slice(1);
             const resolvedPath = path.resolve(process.cwd(), contentFilePath);
             try {
-              content = fs.readFileSync(resolvedPath, 'utf-8');
+              content = fs.readFileSync(resolvedPath, "utf-8");
             } catch (err: any) {
-              console.error(`Error: Failed to read content file "${resolvedPath}": ${err.message}`);
+              console.error(
+                `Error: Failed to read content file "${resolvedPath}": ${err.message}`,
+              );
               process.exit(64);
             }
           } else if (!hasRawFlag) {
             // Unescape \n, \r, \t, and \\ by default unless --raw is passed
             content = content.replace(/\\(.)/g, (match, char) => {
-              if (char === 'n') return '\n';
-              if (char === 'r') return '\r';
-              if (char === 't') return '\t';
-              if (char === '\\') return '\\';
+              if (char === "n") return "\n";
+              if (char === "r") return "\r";
+              if (char === "t") return "\t";
+              if (char === "\\") return "\\";
               return match;
             });
           }
         } else {
-          console.error(`Error: "patch" operation "${op}" requires a content string. Hint: Specify the replacement content string as the last argument.`);
+          console.error(
+            `Error: "patch" operation "${op}" requires a content string. Hint: Specify the replacement content string as the last argument.`,
+          );
           process.exit(64);
         }
       }
@@ -306,16 +369,176 @@ async function main() {
           {
             op,
             anchor_token: anchorToken,
-            ...(op !== 'delete' ? { content } : {})
-          }
+            ...(op !== "delete" ? { content } : {}),
+          },
         ],
         options: {
-          dry_run: !hasCommit
-        }
+          dry_run: !hasCommit,
+        },
       };
+    } else if (command === "safe-replace") {
+      if (args.length < 4) {
+        console.error(
+          'Error: "safe-replace" requires search text and replacement text. Hint: Run "mdse safe-replace <filePath> <search> <replace> [--commit] [--raw] [--json]".',
+        );
+        process.exit(64);
+      }
+      let search = args[2];
+      let replace = args[3];
+
+      const hasCommit = args.includes("--commit");
+      const cleanArgs = args.filter((a) => a !== "--commit");
+
+      if (search.startsWith("@")) {
+        const resolvedPath = path.resolve(process.cwd(), search.slice(1));
+        try {
+          search = fs.readFileSync(resolvedPath, "utf-8");
+        } catch (err: any) {
+          console.error(
+            `Error: Failed to read search file "${resolvedPath}": ${err.message}`,
+          );
+          process.exit(64);
+        }
+      }
+
+      if (replace.startsWith("@")) {
+        const resolvedPath = path.resolve(process.cwd(), replace.slice(1));
+        try {
+          replace = fs.readFileSync(resolvedPath, "utf-8");
+        } catch (err: any) {
+          console.error(
+            `Error: Failed to read replace file "${resolvedPath}": ${err.message}`,
+          );
+          process.exit(64);
+        }
+      } else if (!hasRawFlag) {
+        // Unescape \n, \r, \t, and \\ by default
+        replace = replace.replace(/\\(.)/g, (match, char) => {
+          if (char === "n") return "\n";
+          if (char === "r") return "\r";
+          if (char === "t") return "\t";
+          if (char === "\\") return "\\";
+          return match;
+        });
+      }
+
+      jsonPayload = {
+        file: { path: args[1] },
+        search,
+        replace,
+        options: {
+          dry_run: !hasCommit,
+        },
+      };
+    } else if (command === "safe-patch") {
+      const hasCommit = args.includes("--commit");
+      const cleanArgs = args.filter((a) => a !== "--commit");
+
+      if (cleanArgs.length < 3) {
+        console.error(
+          'Error: "safe-patch" requires arguments. Hint: Run "mdse safe-patch <filePath> <op> <search> [content]" or "mdse safe-patch <filePath> <jsonPayloadPath>".',
+        );
+        process.exit(64);
+      }
+
+      const arg2 = cleanArgs[2];
+      const isSingleOp = [
+        "replace",
+        "delete",
+        "insert_before",
+        "insert_after",
+      ].includes(arg2);
+
+      if (isSingleOp) {
+        const op = arg2;
+        if (cleanArgs.length < 5 && op !== "delete") {
+          console.error(
+            `Error: safe-patch operation "${op}" requires search text and content text. Hint: Run "mdse safe-patch <filePath> ${op} <search> <content> [--commit]".`,
+          );
+          process.exit(64);
+        }
+        if (cleanArgs.length < 4 && op === "delete") {
+          console.error(
+            `Error: safe-patch operation "delete" requires search text. Hint: Run "mdse safe-patch <filePath> delete <search> [--commit]".`,
+          );
+          process.exit(64);
+        }
+
+        let search = cleanArgs[3];
+        let content = op !== "delete" ? cleanArgs[4] : undefined;
+
+        if (search.startsWith("@")) {
+          const resolvedPath = path.resolve(process.cwd(), search.slice(1));
+          try {
+            search = fs.readFileSync(resolvedPath, "utf-8");
+          } catch (err: any) {
+            console.error(
+              `Error: Failed to read search file "${resolvedPath}": ${err.message}`,
+            );
+            process.exit(64);
+          }
+        }
+
+        if (content && content.startsWith("@")) {
+          const resolvedPath = path.resolve(process.cwd(), content.slice(1));
+          try {
+            content = fs.readFileSync(resolvedPath, "utf-8");
+          } catch (err: any) {
+            console.error(
+              `Error: Failed to read content file "${resolvedPath}": ${err.message}`,
+            );
+            process.exit(64);
+          }
+        } else if (content && !hasRawFlag) {
+          content = content.replace(/\\(.)/g, (match, char) => {
+            if (char === "n") return "\n";
+            if (char === "r") return "\r";
+            if (char === "t") return "\t";
+            if (char === "\\") return "\\";
+            return match;
+          });
+        }
+
+        jsonPayload = {
+          file: { path: cleanArgs[1] },
+          operations: [
+            {
+              op,
+              search,
+              ...(content !== undefined ? { content } : {}),
+            },
+          ],
+          options: {
+            dry_run: !hasCommit,
+          },
+        };
+      } else {
+        // Multi-op JSON payload path
+        try {
+          const resolvedPath = path.resolve(process.cwd(), arg2);
+          const fileContent = fs.readFileSync(resolvedPath, "utf-8");
+          const parsed = JSON.parse(fileContent);
+          jsonPayload = {
+            file: { path: cleanArgs[1] },
+            operations: parsed.operations,
+            options: {
+              dry_run: !hasCommit,
+              ...parsed.options,
+            },
+          };
+        } catch (err: any) {
+          console.error(
+            `Error: Failed to read or parse JSON payload file "${arg2}": ${err.message}`,
+          );
+          process.exit(64);
+        }
+      }
     } else {
-      const errRes: any = formatError('IO_ERROR', `Unknown command: ${command}`);
-      errRes.protocol_version = '1.0';
+      const errRes: any = formatError(
+        "IO_ERROR",
+        `Unknown command: ${command}`,
+      );
+      errRes.protocol_version = "1.0";
       errRes.cli_version = cliVersion;
       if (useJson) {
         console.log(JSON.stringify(errRes, null, 2));
@@ -326,12 +549,15 @@ async function main() {
     }
   } else {
     // Read from stdin JSON
-    let inputData = '';
+    let inputData = "";
     try {
       inputData = await readStdin();
     } catch (err: any) {
-      const errRes: any = formatError('IO_ERROR', `Failed to read stdin: ${err.message}`);
-      errRes.protocol_version = '1.0';
+      const errRes: any = formatError(
+        "IO_ERROR",
+        `Failed to read stdin: ${err.message}`,
+      );
+      errRes.protocol_version = "1.0";
       errRes.cli_version = cliVersion;
       if (useJson) {
         console.log(JSON.stringify(errRes, null, 2));
@@ -342,8 +568,11 @@ async function main() {
     }
 
     if (!inputData.trim()) {
-      const errRes: any = formatError('IO_ERROR', 'Empty request payload from stdin.');
-      errRes.protocol_version = '1.0';
+      const errRes: any = formatError(
+        "IO_ERROR",
+        "Empty request payload from stdin.",
+      );
+      errRes.protocol_version = "1.0";
       errRes.cli_version = cliVersion;
       if (useJson) {
         console.log(JSON.stringify(errRes, null, 2));
@@ -356,8 +585,11 @@ async function main() {
     try {
       jsonPayload = JSON.parse(inputData);
     } catch (err: any) {
-      const errRes: any = formatError('IO_ERROR', `Invalid JSON payload: ${err.message}`);
-      errRes.protocol_version = '1.0';
+      const errRes: any = formatError(
+        "IO_ERROR",
+        `Invalid JSON payload: ${err.message}`,
+      );
+      errRes.protocol_version = "1.0";
       errRes.cli_version = cliVersion;
       if (useJson) {
         console.log(JSON.stringify(errRes, null, 2));
@@ -372,47 +604,64 @@ async function main() {
 
   try {
     switch (command) {
-      case 'inspect': {
+      case "inspect": {
         const parsedRequest = InspectRequestSchema.parse(jsonPayload);
         result = inspectService(parsedRequest, allowedRoots);
         break;
       }
-      case 'search': {
+      case "search": {
         const parsedRequest = SearchRequestSchema.parse(jsonPayload);
         result = searchService(parsedRequest, allowedRoots);
         break;
       }
-      case 'read': {
+      case "read": {
         const parsedRequest = ReadRequestSchema.parse(jsonPayload);
         result = readService(parsedRequest, allowedRoots);
         break;
       }
-      case 'patch': {
+      case "patch": {
         const parsedRequest = PatchRequestSchema.parse(jsonPayload);
         result = patchService(parsedRequest, allowedRoots);
         break;
       }
+      case "safe-replace": {
+        const parsedRequest = SafeReplaceRequestSchema.parse(jsonPayload);
+        result = safeReplaceService(parsedRequest, allowedRoots);
+        break;
+      }
+      case "safe-patch": {
+        const parsedRequest = SafePatchRequestSchema.parse(jsonPayload);
+        result = safePatchService(parsedRequest, allowedRoots);
+        break;
+      }
       default:
-        result = formatError('IO_ERROR', `Unknown command: ${command}`);
+        result = formatError("IO_ERROR", `Unknown command: ${command}`);
     }
   } catch (err: any) {
-    if (err.name === 'ZodError') {
-      result = formatError('VALIDATION_FAILED', `Request validation failed: ${err.message}`, err.errors);
+    if (err.name === "ZodError") {
+      result = formatError(
+        "VALIDATION_FAILED",
+        `Request validation failed: ${err.message}`,
+        err.errors,
+      );
     } else {
-      result = formatError('IO_ERROR', err.message || 'An unexpected error occurred.');
+      result = formatError(
+        "IO_ERROR",
+        err.message || "An unexpected error occurred.",
+      );
     }
   }
 
   // Inject protocol and CLI versions
-  if (result && typeof result === 'object') {
-    result.protocol_version = '1.0';
+  if (result && typeof result === "object") {
+    result.protocol_version = "1.0";
     result.cli_version = cliVersion;
   }
 
   // Output formatting
-  if (command === 'read' && hasRawFlag && result.ok) {
+  if (command === "read" && hasRawFlag && result.ok) {
     if (Array.isArray(result.nodes)) {
-      const output = result.nodes.map((n: any) => n.content).join('\n');
+      const output = result.nodes.map((n: any) => n.content).join("\n");
       console.log(output);
     }
   } else if (useJson) {
@@ -428,35 +677,35 @@ async function main() {
 function getExitCode(result: any): number {
   if (!result) return 6;
   if (result.ok !== false) return 0;
-  
+
   const errorCode = result.error?.code;
   if (!errorCode) return 1;
-  
+
   switch (errorCode) {
-    case 'DOCUMENT_CHANGED':
-    case 'TARGET_CHANGED':
-    case 'TARGET_MISSING':
+    case "DOCUMENT_CHANGED":
+    case "TARGET_CHANGED":
+    case "TARGET_MISSING":
       return 2;
-    case 'ANCHOR_EXPIRED':
+    case "ANCHOR_EXPIRED":
       return 3;
-    case 'ANCHOR_INVALID':
-    case 'ANCHOR_AMBIGUOUS':
-    case 'ANCHOR_INSUFFICIENT_EVIDENCE':
+    case "ANCHOR_INVALID":
+    case "ANCHOR_AMBIGUOUS":
+    case "ANCHOR_INSUFFICIENT_EVIDENCE":
       return 4;
-    case 'VALIDATION_FAILED':
-    case 'INVALID_REPLACEMENT':
-    case 'UNSUPPORTED_SYNTAX':
-    case 'OVERLAPPING_OPERATIONS':
+    case "VALIDATION_FAILED":
+    case "INVALID_REPLACEMENT":
+    case "UNSUPPORTED_SYNTAX":
+    case "OVERLAPPING_OPERATIONS":
       return 5;
-    case 'IO_ERROR':
-    case 'COMMIT_RACE':
+    case "IO_ERROR":
+    case "COMMIT_RACE":
       return 6;
     default:
       return 6;
   }
 }
 
-main().catch(err => {
+main().catch((err) => {
   console.error(err);
   process.exit(6);
 });

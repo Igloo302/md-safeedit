@@ -155,6 +155,16 @@ mdse patch path/to/file.md replace <anchor_token> "新修改的内容" --json
 
 # 5. 确认并原子写入
 mdse patch path/to/file.md replace <anchor_token> "新修改的内容" --commit --json
+
+# 6. 一步到位原子替换（高阶优化工具）
+# 搜索、读取、校验并替换。默认 dry-run 预览差异，加 --commit 写入磁盘。
+mdse safe-replace path/to/file.md "查找唯一文本" "新修改的内容" [--commit] --json
+
+# 7. 一步到位多操作原子补丁（高阶事务优化工具）
+# 支持单个操作快捷调用：
+mdse safe-patch path/to/file.md <op: replace|delete|insert_before|insert_after> "查找唯一文本" ["新内容"] [--commit] --json
+# 也支持从 JSON 事务文件读取多操作组合：
+mdse safe-patch path/to/file.md path/to/payload.json [--commit] --json
 ```
 
 ---

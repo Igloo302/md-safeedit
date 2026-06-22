@@ -1,0 +1,34 @@
+{
+  "task-001": {
+    "conversationId": "4cb54bcb-9e73-457b-b0c1-90a59e7056b0",
+    "startedAt": "2026-06-21T23:22:40+08:00"
+  },
+  "task-004": {
+    "conversationId": "c4b2101d-cc97-4281-b2e8-b3af7c62bdad",
+    "startedAt": "2026-06-21T23:22:40+08:00"
+  },
+  "task-007": {
+    "conversationId": "ba422b39-834b-4cc8-b49b-ca0a13ebad79",
+    "startedAt": "2026-06-21T23:22:40+08:00"
+  },
+  "task-011": {
+    "conversationId": "42f357fa-6941-4185-8364-1510a2f6a935",
+    "startedAt": "2026-06-21T23:22:40+08:00"
+  },
+  "task-016": {
+    "conversationId": "b34fb4aa-76cc-46c0-a056-97d7c62eb11e",
+    "startedAt": "2026-06-21T23:22:40+08:00"
+  },
+  "task-026": {
+    "conversationId": "44be2e7c-abbd-4db7-b94d-6f2235ca490b",
+    "startedAt": "2026-06-21T23:22:40+08:00"
+  },
+  "task-029": {
+    "conversationId": "f4b4d7a0-f7ee-43f2-903a-3858209677ba",
+    "startedAt": "2026-06-21T23:22:40+08:00"
+  },
+  "task-034": {
+    "conversationId": "1ac68d77-d5fa-454b-bea2-fb21c82e7b03",
+    "startedAt": "2026-06-21T23:22:40+08:00"
+  }
+}

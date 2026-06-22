@@ -2,9 +2,44 @@
 
 This document details the standard operation sequence for reading and mutating Markdown files using MD SafeEdit.
 
-## Workflow Sequence
+## Workflow Options
 
-Agents MUST always follow this sequential execution protocol when reading or modifying Markdown documents:
+### Option A: Combined Atomic Replace/Patch (Recommended)
+When the target block contains unique text that allows direct relocation, use the high-level `safe-replace`/`safe-patch` (CLI) or `safe_replace`/`safe_patch` (MCP) command. This executes search, read, CAS verification, relocation, and patch in a single round-trip:
+
+```mermaid
+graph TD
+    A[Start] --> B{Is MD file?};
+    B -- No --> C[Use standard fs tools];
+    B -- Yes --> D[Run safe-replace/safe-patch CLI or safe_replace/safe_patch MCP];
+    D --> E{Ambiguous / Missing?};
+    E -- Yes --> F[Fallback to Option B];
+    E -- No --> G[Preview / Commit complete];
+    G --> H[End];
+```
+
+- **Using CLI (Single-op Dry-run)**:
+  ```bash
+  mdse safe-replace path/to/file.md "Target unique text" "Replacement content" --json
+  mdse safe-patch path/to/file.md delete "Target unique text" --json
+  ```
+- **Using CLI (Single-op Commit)**:
+  ```bash
+  mdse safe-replace path/to/file.md "Target unique text" "Replacement content" --commit --json
+  mdse safe-patch path/to/file.md delete "Target unique text" --commit --json
+  ```
+- **Using CLI (Multi-op Commit via JSON file)**:
+  ```bash
+  mdse safe-patch path/to/file.md path/to/payload.json --commit --json
+  ```
+- **Using MCP**:
+  - For single replacement: call `safe_replace` tool.
+  - For deletion, insertions, or multi-op transactions: call `safe_patch` tool. Set `options.dry_run = false` to commit to disk.
+
+---
+
+### Option B: Multi-Step Sequential Workflow
+Use this option for complex merges or when the search text is ambiguous:
 
 ```mermaid
 graph TD
@@ -13,10 +48,10 @@ graph TD
     B -- Yes --> D[Inspect Outline / Search];
     D --> E[Read Target Node & Get Token];
     E --> F[Reason & Make Edit Locally];
-    G -- Success (Status: Preview) --> H[Commit with --commit / dry_run:false];
-    H --> I[End];
-    G -- Failure / Conflict --> J[Error Recovery Workflow];
     F --> G[Dry Run Patch];
+    G -- Success --> H[Commit with --commit / dry_run:false];
+    G -- Failure / Conflict --> I[Error Recovery Workflow];
+    H --> J[End];
 ```
 
 ### Step 1: Inspect or Search (Locate Target ID)
